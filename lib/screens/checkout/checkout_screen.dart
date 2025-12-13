@@ -26,7 +26,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   Future<void> _loadCheckoutData() async {
     setState(() => _isLoading = true);
     try {
-      final data = await TableService.checkout(widget.table.id);
+      // Use PREVIEW checkout - does NOT end session
+      final data = await TableService.previewCheckout(widget.table.id);
       setState(() {
         _checkoutData = data;
         _isLoading = false;

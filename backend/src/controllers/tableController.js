@@ -172,6 +172,7 @@ exports.delete = async (req, res) => {
 exports.book = async (req, res) => {
     try {
         const { id } = req.params;
+        const { startTime } = req.body; // Accept startTime from client
 
         // Check if table is already occupied
         const table = await prisma.table.findUnique({
@@ -192,10 +193,17 @@ exports.book = async (req, res) => {
         }
 
         // Create new session and update table status
+        const sessionData = {
+            tableId: parseInt(id),
+        };
+
+        // Use client time if provided, otherwise use server time
+        if (startTime) {
+            sessionData.startTime = new Date(startTime);
+        }
+
         const session = await prisma.tableSession.create({
-            data: {
-                tableId: parseInt(id),
-            },
+            data: sessionData,
         });
 
         await prisma.table.update({
@@ -206,6 +214,73 @@ exports.book = async (req, res) => {
         res.json({ session, message: 'Table booked successfully' });
     } catch (error) {
         console.error('Book table error:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
+// Preview checkout (calculate charges WITHOUT ending session)
+exports.previewCheckout = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        // Find active session
+        const table = await prisma.table.findUnique({
+            where: { id: parseInt(id) },
+            include: {
+                sessions: {
+                    where: { endTime: null },
+                    include: {
+                        orders: {
+                            include: {
+                                items: {
+                                    include: { dish: true },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        });
+
+        if (!table || table.sessions.length === 0) {
+            return res.status(400).json({ error: 'No active session found' });
+        }
+
+        const session = table.sessions[0];
+        const { getVietnamTime } = require('../utils/timezone');
+        const currentTime = getVietnamTime();
+        const startTime = new Date(session.startTime);
+        const totalHours = (currentTime - startTime) / (1000 * 60 * 60);
+        const hourlyCharge = totalHours * table.hourlyRate;
+
+        // Calculate order total
+        const orderTotal = session.orders.reduce((sum, order) => {
+            return sum + order.items.reduce((orderSum, item) => {
+                return orderSum + (item.price * item.quantity);
+            }, 0);
+        }, 0);
+
+        const grandTotal = hourlyCharge + orderTotal;
+
+        // Return preview WITHOUT ending session
+        res.json({
+            session: {
+                ...session,
+                totalHours,
+                hourlyCharge,
+            },
+            table: {
+                id: table.id,
+                name: table.name,
+                hourlyRate: table.hourlyRate,
+                totalHours,
+            },
+            orderTotal,
+            hourlyCharge,
+            grandTotal,
+        });
+    } catch (error) {
+        console.error('Preview checkout error:', error);
         res.status(500).json({ error: 'Internal server error' });
     }
 };
@@ -239,7 +314,8 @@ exports.checkout = async (req, res) => {
         }
 
         const session = table.sessions[0];
-        const endTime = new Date();
+        const { getVietnamTime } = require('../utils/timezone');
+        const endTime = getVietnamTime(); // Use Vietnam time
         const startTime = new Date(session.startTime);
         const totalHours = (endTime - startTime) / (1000 * 60 * 60); // Convert ms to hours
         const hourlyCharge = totalHours * table.hourlyRate;

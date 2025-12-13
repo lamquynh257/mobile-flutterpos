@@ -198,18 +198,15 @@ class LobbyScreen extends HookWidget {
             ),
             const Divider(),
             ListTile(
+              leading: const Icon(Icons.assessment),
               title: Text(
-                AppLocalizations.of(context)?.lobby_report.toUpperCase() ?? 'HISTORY',
+                AppLocalizations.of(context)?.lobby_report.toUpperCase() ?? 'REPORT',
                 textAlign: TextAlign.center,
               ),
-              onTap: () => Navigator.pushNamed(context, '/history'),
-            ),
-            ListTile(
-              title: Text(
-                AppLocalizations.of(context)?.lobby_journal.toUpperCase() ?? 'EXPENSE JOURNAL',
-                textAlign: TextAlign.center,
-              ),
-              onTap: () => Navigator.pushNamed(context, '/expense'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.pushNamed(context, '/history');
+              },
             ),
             const Divider(),
             ListTile(

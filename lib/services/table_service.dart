@@ -83,7 +83,18 @@ class TableService {
   
   // Book table (start session)
   static Future<Map<String, dynamic>> book(int id) async {
-    final response = await ApiService.post('/tables/$id/book', {});
+    final response = await ApiService.post(
+      '/tables/$id/book',
+      {
+        'startTime': DateTime.now().toIso8601String(), // Send client's local time
+      },
+    );
+    return ApiService.handleResponse(response);
+  }
+  
+  // Preview checkout (calculate charges WITHOUT ending session)
+  static Future<Map<String, dynamic>> previewCheckout(int id) async {
+    final response = await ApiService.get('/tables/$id/preview-checkout');
     return ApiService.handleResponse(response);
   }
   

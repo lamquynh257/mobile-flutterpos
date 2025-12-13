@@ -13,6 +13,7 @@ router.delete('/:id', tableController.delete);
 
 // Special routes for table booking
 router.post('/:id/book', tableController.book);
+router.get('/:id/preview-checkout', tableController.previewCheckout); // Preview without ending session
 router.post('/:id/checkout', tableController.checkout);
 
 module.exports = router;

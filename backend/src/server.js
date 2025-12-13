@@ -1,4 +1,8 @@
 require('dotenv').config();
+
+// Set timezone to Vietnam (UTC+7)
+process.env.TZ = 'Asia/Ho_Chi_Minh';
+
 const express = require('express');
 const cors = require('cors');
 const prisma = require('./config/database');
