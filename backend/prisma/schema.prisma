@@ -1,0 +1,168 @@
+// Prisma schema for Flutter POS Backend
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// User model for authentication and authorization
+model User {
+  id        Int      @id @default(autoincrement())
+  username  String   @unique @db.VarChar(50)
+  password  String   @db.VarChar(255) // bcrypt hashed
+  role      UserRole @default(STAFF)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("users")
+}
+
+enum UserRole {
+  ADMIN
+  STAFF
+}
+
+// Floor model - represents different floors/areas
+model Floor {
+  id     Int     @id @default(autoincrement())
+  name   String  @db.VarChar(100)
+  order  Int     @default(0) // Display order
+  tables Table[]
+
+  @@map("floors")
+}
+
+// Table model - represents tables on each floor
+model Table {
+  id         Int         @id @default(autoincrement())
+  floorId    Int
+  name       String      @db.VarChar(50)
+  x          Float       @default(0) // Position X for UI
+  y          Float       @default(0) // Position Y for UI
+  hourlyRate Float       @default(0) // Price per hour
+  status     TableStatus @default(EMPTY)
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+
+  floor    Floor          @relation(fields: [floorId], references: [id], onDelete: Cascade)
+  sessions TableSession[]
+  orders   Order[]
+
+  @@index([floorId])
+  @@map("tables")
+}
+
+enum TableStatus {
+  EMPTY
+  RESERVED
+  OCCUPIED
+}
+
+// Category model for menu organization
+model Category {
+  id     Int     @id @default(autoincrement())
+  name   String  @db.VarChar(100)
+  order  Int     @default(0) // Display order
+  dishes Dish[]
+
+  @@map("categories")
+}
+
+// Dish model - menu items
+model Dish {
+  id         Int         @id @default(autoincrement())
+  categoryId Int
+  name       String      @db.VarChar(200)
+  price      Float
+  image      String?     @db.Text // URL or base64
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+
+  category   Category    @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  orderItems OrderItem[]
+
+  @@index([categoryId])
+  @@map("dishes")
+}
+
+// TableSession model - tracks table usage time
+model TableSession {
+  id           Int       @id @default(autoincrement())
+  tableId      Int
+  startTime    DateTime  @default(now())
+  endTime      DateTime?
+  totalHours   Float?
+  hourlyCharge Float?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  table    Table     @relation(fields: [tableId], references: [id], onDelete: Cascade)
+  orders   Order[]
+  payments Payment[]
+
+  @@index([tableId])
+  @@map("table_sessions")
+}
+
+// Order model - customer orders
+model Order {
+  id             Int          @id @default(autoincrement())
+  tableSessionId Int?
+  tableId        Int
+  status         OrderStatus  @default(PENDING)
+  total          Float        @default(0)
+  discountRate   Float        @default(1.0)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  tableSession TableSession? @relation(fields: [tableSessionId], references: [id], onDelete: SetNull)
+  table        Table         @relation(fields: [tableId], references: [id], onDelete: Cascade)
+  items        OrderItem[]
+  payments     Payment[]
+
+  @@index([tableSessionId])
+  @@index([tableId])
+  @@map("orders")
+}
+
+enum OrderStatus {
+  PENDING
+  COMPLETED
+  CANCELLED
+}
+
+// OrderItem model - items in an order
+model OrderItem {
+  id       Int   @id @default(autoincrement())
+  orderId  Int
+  dishId   Int
+  quantity Int   @default(1)
+  price    Float // Price at time of order
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  dish  Dish  @relation(fields: [dishId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([dishId])
+  @@map("order_items")
+}
+
+// Payment model - payment records
+model Payment {
+  id             Int       @id @default(autoincrement())
+  orderId        Int?
+  tableSessionId Int?
+  amount         Float
+  method         String    @default("CASH") @db.VarChar(50)
+  paidAt         DateTime  @default(now())
+
+  order        Order?        @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  tableSession TableSession? @relation(fields: [tableSessionId], references: [id], onDelete: SetNull)
+
+  @@index([orderId])
+  @@index([tableSessionId])
+  @@map("payments")
+}

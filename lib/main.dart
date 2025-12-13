@@ -11,6 +11,13 @@ import 'screens/edit_menu/main.dart';
 import 'screens/history/main.dart';
 import 'screens/expense_journal/main.dart';
 import 'screens/lobby/main.dart';
+import 'screens/login/login_screen.dart';
+import 'screens/management/floor_management_screen.dart';
+import 'screens/management/table_management_screen.dart';
+import 'screens/checkout/checkout_screen.dart';
+import 'services/auth_service.dart';
+import 'models/floor.dart';
+import 'models/table_model.dart';
 import 'storage_engines/connection_interface.dart';
 
 void main() {
@@ -82,9 +89,37 @@ class PosApp extends StatelessWidget {
           }
         },
       ),
-      home: LobbyScreen(),
+      home: FutureBuilder<bool>(
+        future: AuthService.isAuthenticated(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Scaffold(
+              body: Center(
+                child: CircularProgressIndicator(),
+              ),
+            );
+          }
+          
+          final isAuthenticated = snapshot.data ?? false;
+          return isAuthenticated ? LobbyScreen() : const LoginScreen();
+        },
+      ),
       onGenerateRoute: (settings) {
         switch (settings.name) {
+          case '/login':
+            return MaterialPageRoute(builder: (_) => const LoginScreen());
+          case '/floor-management':
+            return MaterialPageRoute(builder: (_) => const FloorManagementScreen());
+          case '/table-management':
+            final floor = settings.arguments as Floor;
+            return MaterialPageRoute(
+              builder: (_) => TableManagementScreen(floor: floor),
+            );
+          case '/checkout':
+            final table = settings.arguments as TableModel;
+            return MaterialPageRoute(
+              builder: (_) => CheckoutScreen(table: table),
+            );
           case '/history':
             return routeBuilder(
               DefaultTabController(

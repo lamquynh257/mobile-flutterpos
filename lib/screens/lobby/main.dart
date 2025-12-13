@@ -7,7 +7,12 @@ import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
 import '../../database_factory.dart';
 import '../../storage_engines/connection_interface.dart';
+import '../../models/floor.dart' as ApiFloor;
+import '../../models/table_model.dart';
+import '../../services/floor_service.dart';
+import '../../services/table_service.dart';
 import './table_icon.dart';
+import './table_action_dialog.dart';
 import '../../common/common.dart';
 import '../../theme/rally.dart';
 import '../../provider/src.dart';
@@ -16,69 +21,97 @@ import 'anim_longclick_fab.dart';
 class LobbyScreen extends HookWidget {
   @override
   Widget build(BuildContext context) {
-    // store previous index when adding tab
-    final prevIdx = useRef<int?>(null);
+    final floors = useState<List<ApiFloor.Floor>>([]);
+    final isLoading = useState(true);
+    final currentFloorIndex = useState(0);
 
-    // states
-    final maxTab = useState(0);
-    maxTab.value = context
-        .select((ConfigSupplier? cs) => cs?.maxTab ?? 0); // "sync" internal state with repo changes
+    // Load floors from API
+    useEffect(() {
+      Future<void> loadFloors() async {
+        try {
+          final loadedFloors = await FloorService.getAll();
+          floors.value = loadedFloors;
+          isLoading.value = false;
+        } catch (e) {
+          isLoading.value = false;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Lỗi load tầng: ${e.toString()}')),
+          );
+        }
+      }
 
-    // computed values
+      loadFloors();
+      return null;
+    }, []);
+
     final tabs = useMemoized(
-      () => [for (int i = 1; i <= maxTab.value; i++) Tab(text: i.toString())],
-      [maxTab.value],
+      () => floors.value.map((f) => Tab(text: f.name)).toList(),
+      [floors.value],
     );
-    final views = useMemoized(
-      () => [for (int i = 0; i < maxTab.value; i++) _InteractiveBody(i)],
-      [maxTab.value],
-    );
-    final ticker = useSingleTickerProvider(keys: [maxTab.value]);
-    // for dynamic tab length to work, new controller need to be created every time a tab is added
+
+    final ticker = useSingleTickerProvider(keys: [floors.value.length]);
     final controller = useMemoized(
-      () => TabController(length: maxTab.value, vsync: ticker),
-      [maxTab.value],
+      () {
+        // Ensure length is at least 1 to avoid "Invalid argument: 0" error
+        final length = floors.value.length > 0 ? floors.value.length : 1;
+        return TabController(
+          length: length,
+          vsync: ticker,
+          initialIndex: currentFloorIndex.value.clamp(0, length - 1),
+        );
+      },
+      [floors.value.length],
     );
 
     useEffect(() {
-      // animate to new tab with the new controller
-      if (prevIdx.value != null) {
-        controller.index = prevIdx.value!;
-        controller.animateTo(maxTab.value - 1);
+      void listener() {
+        if (floors.value.isNotEmpty) {
+          currentFloorIndex.value = controller.index;
+        }
       }
-      return;
-    }, [maxTab.value]);
+
+      controller.addListener(listener);
+      return () => controller.removeListener(listener);
+    }, [controller]);
+
+    if (isLoading.value) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (floors.value.isEmpty) {
+      return Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.layers_outlined, size: 64, color: Colors.grey),
+              const SizedBox(height: 16),
+              const Text('Chưa có tầng nào'),
+              const SizedBox(height: 16),
+              ElevatedButton.icon(
+                onPressed: () => Navigator.pushNamed(context, '/floor-management'),
+                icon: const Icon(Icons.add),
+                label: const Text('Quản lý tầng & bàn'),
+              ),
+            ],
+          ),
+        ),
+        bottomNavigationBar: _buildBottomBar(context),
+      );
+    }
 
     return Scaffold(
-      bottomNavigationBar: BottomAppBar(
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: [
-            Tooltip(
-              message: AppLocalizations.of(context)?.lobby_report ?? 'Report',
-              child: MaterialButton(
-                onPressed: () {
-                  showBottomSheetMenu(context);
-                },
-                minWidth: MediaQuery.of(context).size.width / 2,
-                shape: const CustomShape(side: CustomShapeSide.left),
-                child: const Icon(Icons.menu),
-              ),
-            ),
-            Tooltip(
-              message: AppLocalizations.of(context)?.lobby_menuEdit ?? 'Edit Menu',
-              child: MaterialButton(
-                onPressed: () => Navigator.pushNamed(context, '/edit-menu'),
-                minWidth: MediaQuery.of(context).size.width / 2,
-                shape: const CustomShape(side: CustomShapeSide.right),
-                child: const Icon(Icons.menu_book_sharp),
-              ),
-            )
-          ],
-        ),
-      ),
+      bottomNavigationBar: _buildBottomBar(context),
       floatingActionButton: AnimatedLongClickableFAB(
-        onLongPress: () => context.read<NodeSupplier>().addNode(controller.index),
+        onLongPress: () {
+          // Keep old functionality for adding tables via long press
+          if (floors.value.isNotEmpty) {
+            final currentFloor = floors.value[controller.index];
+            context.read<NodeSupplier>().addNode(currentFloor.id);
+          }
+        },
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
       appBar: AppBar(
@@ -89,12 +122,16 @@ class LobbyScreen extends HookWidget {
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.add),
-            onPressed: () {
-              maxTab.value++;
-              context.read<ConfigSupplier>().addTab();
-              prevIdx.value = controller.index;
-              controller.dispose();
+            icon: const Icon(Icons.refresh),
+            onPressed: () async {
+              isLoading.value = true;
+              try {
+                final loadedFloors = await FloorService.getAll();
+                floors.value = loadedFloors;
+                isLoading.value = false;
+              } catch (e) {
+                isLoading.value = false;
+              }
             },
           ),
         ],
@@ -102,20 +139,63 @@ class LobbyScreen extends HookWidget {
       body: TabBarView(
         physics: const NeverScrollableScrollPhysics(),
         controller: controller,
-        children: views,
+        children: floors.value
+            .map((floor) => _FloorTabView(floor: floor))
+            .toList(),
       ),
     );
   }
 
-  Future showBottomSheetMenu(BuildContext context) {
+  Widget _buildBottomBar(BuildContext context) {
+    return BottomAppBar(
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          Tooltip(
+            message: AppLocalizations.of(context)?.lobby_report ?? 'Report',
+            child: MaterialButton(
+              onPressed: () {
+                _showBottomSheetMenu(context);
+              },
+              minWidth: MediaQuery.of(context).size.width / 2,
+              shape: const CustomShape(side: CustomShapeSide.left),
+              child: const Icon(Icons.menu),
+            ),
+          ),
+          Tooltip(
+            message: AppLocalizations.of(context)?.lobby_menuEdit ?? 'Edit Menu',
+            child: MaterialButton(
+              onPressed: () => Navigator.pushNamed(context, '/edit-menu'),
+              minWidth: MediaQuery.of(context).size.width / 2,
+              shape: const CustomShape(side: CustomShapeSide.right),
+              child: const Icon(Icons.menu_book_sharp),
+            ),
+          )
+        ],
+      ),
+    );
+  }
+
+  Future _showBottomSheetMenu(BuildContext context) {
     return showModalBottomSheet(
       context: context,
-      // isScrollControlled combined with shrinkWrap for minimal height in bottom sheet
       isScrollControlled: true,
       builder: (context) {
         return ListView(
           shrinkWrap: true,
           children: [
+            ListTile(
+              leading: const Icon(Icons.layers),
+              title: const Text(
+                'QUẢN LÝ TẦNG & BÀN',
+                textAlign: TextAlign.center,
+              ),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.pushNamed(context, '/floor-management');
+              },
+            ),
+            const Divider(),
             ListTile(
               title: Text(
                 AppLocalizations.of(context)?.lobby_report.toUpperCase() ?? 'HISTORY',
@@ -137,76 +217,241 @@ class LobbyScreen extends HookWidget {
   }
 }
 
-/// Allow panning & dragging widgets inside...
-class _InteractiveBody extends StatefulWidget {
-  final int page;
+/// Floor tab view showing tables from API
+class _FloorTabView extends StatefulWidget {
+  final ApiFloor.Floor floor;
 
-  _InteractiveBody(this.page) : super(key: ObjectKey(page));
+  const _FloorTabView({Key? key, required this.floor}) : super(key: key);
 
   @override
-  State<_InteractiveBody> createState() => _InteractiveBodyState();
+  State<_FloorTabView> createState() => _FloorTabViewState();
 }
 
-class _InteractiveBodyState extends State<_InteractiveBody>
-    with AutomaticKeepAliveClientMixin<_InteractiveBody> {
-  /// The key to container (1)
+class _FloorTabViewState extends State<_FloorTabView>
+    with AutomaticKeepAliveClientMixin {
+  List<TableModel> _tables = [];
+  bool _isLoading = true;
   late GlobalKey bgKey;
-
   late TransformationController transformController;
-
   final _dragEndEvent = StreamController<Map<String, num>>.broadcast();
+  Timer? _timer;
 
   @override
   void initState() {
     super.initState();
     bgKey = GlobalKey();
     transformController = TransformationController();
+    _loadTables();
+    
+    // Update timer every second for occupied tables
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (mounted && _tables.any((t) => t.isOccupied)) {
+        setState(() {
+          // Force rebuild to update timer display
+        });
+      }
+    });
+  }
+
+  Future<void> _loadTables() async {
+    setState(() => _isLoading = true);
+    try {
+      final tables = await TableService.getAll(floorId: widget.floor.id);
+      print('📊 Loaded ${tables.length} tables for floor ${widget.floor.id}');
+      
+      // Auto-arrange tables if they're all at (0,0)
+      final needsArrange = tables.isNotEmpty && tables.every((t) => t.x == 0 && t.y == 0);
+      print('🔧 Needs arrange: $needsArrange');
+      
+      if (needsArrange) {
+        print('🎯 Auto-arranging ${tables.length} tables...');
+        await _autoArrangeTables(tables);
+        print('✅ Auto-arrange complete, reloading...');
+        // Reload after arranging
+        final updatedTables = await TableService.getAll(floorId: widget.floor.id);
+        print('📊 Reloaded ${updatedTables.length} tables after arrange');
+        setState(() {
+          _tables = updatedTables;
+          _isLoading = false;
+        });
+      } else {
+        print('✅ Tables already arranged');
+        setState(() {
+          _tables = tables;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      print('❌ Error loading tables: $e');
+      setState(() => _isLoading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Lỗi load bàn: ${e.toString()}')),
+        );
+      }
+    }
+  }
+
+  Future<void> _autoArrangeTables(List<TableModel> tables) async {
+    // Arrange tables in a grid pattern
+    const double startX = 20;
+    const double startY = 20;
+    const double spacing = 100;
+    const int tablesPerRow = 4;
+
+    print('🎨 Starting auto-arrange for ${tables.length} tables');
+    for (int i = 0; i < tables.length; i++) {
+      final row = i ~/ tablesPerRow;
+      final col = i % tablesPerRow;
+      final x = startX + (col * spacing);
+      final y = startY + (row * spacing);
+
+      print('  📍 Table ${tables[i].name}: ($x, $y)');
+      try {
+        await TableService.update(tables[i].id, x: x, y: y);
+        print('  ✅ Updated ${tables[i].name}');
+      } catch (e) {
+        print('  ❌ Error updating ${tables[i].name}: $e');
+      }
+    }
+    print('🎨 Auto-arrange loop complete');
   }
 
   @override
   void dispose() {
+    _timer?.cancel();
     transformController.dispose();
     _dragEndEvent.close();
     super.dispose();
   }
 
+  Color _getTableColor(String status) {
+    switch (status) {
+      case 'EMPTY':
+        return Colors.green;
+      case 'OCCUPIED':
+        return Colors.red;
+      case 'RESERVED':
+        return Colors.orange;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  String _formatElapsedTime(Duration? elapsed) {
+    if (elapsed == null) return '';
+    final hours = elapsed.inHours;
+    final minutes = elapsed.inMinutes % 60;
+    final seconds = elapsed.inSeconds % 60;
+    
+    return '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+  }
+
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    final supplier = Provider.of<NodeSupplier>(context, listen: true);
+
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_tables.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.table_restaurant, size: 64, color: Colors.grey),
+            const SizedBox(height: 16),
+            Text('Chưa có bàn nào trong ${widget.floor.name}'),
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              onPressed: () {
+                Navigator.pushNamed(
+                  context,
+                  '/table-management',
+                  arguments: widget.floor,
+                );
+              },
+              icon: const Icon(Icons.add),
+              label: const Text('Thêm bàn'),
+            ),
+          ],
+        ),
+      );
+    }
+
     return InteractiveViewer(
       maxScale: 2.0,
       transformationController: transformController,
       child: Stack(
         children: [
-          // create a container (1) here to act as fixed background
           Container(key: bgKey),
-          for (var node in supplier.nodes(widget.page))
-            ChangeNotifierProvider(
-              key: ObjectKey(node),
-              create: (_) {
-                final database = context.read<DatabaseConnectionInterface?>();
-                return OrderSupplier(
-                  database: database != null
-                      ? DatabaseFactory().createRIDRepository<Order>(database)
-                      : null,
-                  order: Order.create(tableID: node.id),
-                );
-              },
-              child: DraggableWidget(
-                x: node.x,
-                y: node.y,
-                onDragEnd: (x, y) {
-                  node.x = x;
-                  node.y = y;
-                  supplier.updateNode(node);
-                  _dragEndEvent.add({'id': node.id, 'x': x, 'y': y});
+          for (var table in _tables)
+            Positioned(
+              left: table.x,
+              top: table.y,
+              child: GestureDetector(
+                onTap: () async {
+                  final result = await showDialog(
+                    context: context,
+                    builder: (context) => TableActionDialog(
+                      table: table,
+                      onRefresh: _loadTables,
+                    ),
+                  );
+                  
+                  // Refresh if dialog returned true (after checkout)
+                  if (result == true) {
+                    _loadTables();
+                  }
                 },
-                key: ObjectKey(node),
-                child: TableIcon(
-                  node: node,
-                  containerKey: bgKey,
-                  dragEndEventStream: _dragEndEvent.stream,
+                child: Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    color: _getTableColor(table.status),
+                    borderRadius: BorderRadius.circular(8),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Colors.black26,
+                        blurRadius: 4,
+                        offset: Offset(2, 2),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.table_restaurant, color: Colors.white, size: 20),
+                      const SizedBox(height: 4),
+                      Text(
+                        table.name,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                      ),
+                      if (table.isOccupied && table.elapsedTime != null) ...[
+                        const SizedBox(height: 2),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.black26,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            _formatElapsedTime(table.elapsedTime),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
                 ),
               ),
             ),
