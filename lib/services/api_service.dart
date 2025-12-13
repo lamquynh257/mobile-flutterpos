@@ -7,7 +7,7 @@ class ApiService {
   // For Android emulator: http://10.0.2.2:3000
   // For real device on same network: http://YOUR_IP:3000
   // For web/desktop: http://localhost:3000
-  static const String baseUrl = 'http://localhost:3000/api';
+  static const String baseUrl = 'http://192.168.0.140:3000/api';
   
   static String? _token;
   

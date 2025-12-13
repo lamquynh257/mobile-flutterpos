@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../services/auth_service.dart';
+import '../lobby/main.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
@@ -37,8 +38,10 @@ class _LoginScreenState extends State<LoginScreen> {
       );
 
       if (mounted) {
-        // Navigate to lobby and remove all previous routes
-        Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
+        // Navigate to lobby screen directly
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => LobbyScreen()),
+        );
       }
     } catch (e) {
       setState(() {

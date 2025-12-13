@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../models/table_model.dart';
 import '../../services/table_service.dart';
+import '../checkout/checkout_screen.dart';
+import '../order/order_food_screen.dart';
 
 class TableActionDialog extends StatelessWidget {
   final TableModel table;
@@ -166,10 +168,11 @@ class TableActionDialog extends StatelessWidget {
                 child: ElevatedButton.icon(
                   onPressed: () async {
                     Navigator.pop(context); // Close dialog first
-                    final result = await Navigator.pushNamed(
+                    final result = await Navigator.push(
                       context,
-                      '/checkout',
-                      arguments: table,
+                      MaterialPageRoute(
+                        builder: (_) => CheckoutScreen(table: table),
+                      ),
                     );
                     
                     // If checkout completed, refresh and close
@@ -193,10 +196,11 @@ class TableActionDialog extends StatelessWidget {
               child: OutlinedButton.icon(
                 onPressed: () async {
                   Navigator.pop(context); // Close dialog
-                  final result = await Navigator.pushNamed(
+                  final result = await Navigator.push(
                     context,
-                    '/order-details',
-                    arguments: table,
+                    MaterialPageRoute(
+                      builder: (_) => ModernOrderScreen(table: table),
+                    ),
                   );
                   
                   // Refresh if order was placed

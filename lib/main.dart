@@ -18,6 +18,7 @@ import 'screens/management/user_management_screen.dart';
 import 'screens/checkout/checkout_screen.dart';
 import 'screens/menu/menu_management_screen.dart';
 import 'screens/order/order_food_screen.dart'; // ModernOrderScreen
+import 'screens/report/report_screen.dart';
 import 'screens/order_details/main.dart';
 import 'services/auth_service.dart';
 import 'models/floor.dart';
@@ -134,17 +135,7 @@ class PosApp extends StatelessWidget {
           case '/user-management':
             return MaterialPageRoute(builder: (_) => const UserManagementScreen());
           case '/history':
-            return routeBuilder(
-              DefaultTabController(
-                length: 2,
-                child: ChangeNotifierProvider(
-                  create: (_) => HistoryOrderSupplier(
-                    database: DatabaseFactory().createRIDRepository<Order>(_storage),
-                  ),
-                  child: HistoryScreen(),
-                ),
-              ),
-            );
+            return MaterialPageRoute(builder: (_) => const ReportScreen());
           case '/expense':
             return routeBuilder(
               ChangeNotifierProvider(
