@@ -15,6 +15,7 @@ import 'screens/login/login_screen.dart';
 import 'screens/management/floor_management_screen.dart';
 import 'screens/management/table_management_screen.dart';
 import 'screens/checkout/checkout_screen.dart';
+import 'screens/menu/menu_management_screen.dart';
 import 'services/auth_service.dart';
 import 'models/floor.dart';
 import 'models/table_model.dart';
@@ -120,6 +121,8 @@ class PosApp extends StatelessWidget {
             return MaterialPageRoute(
               builder: (_) => CheckoutScreen(table: table),
             );
+          case '/menu-management':
+            return MaterialPageRoute(builder: (_) => const MenuManagementScreen());
           case '/history':
             return routeBuilder(
               DefaultTabController(

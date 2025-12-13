@@ -195,6 +195,17 @@ class LobbyScreen extends HookWidget {
                 Navigator.pushNamed(context, '/floor-management');
               },
             ),
+            ListTile(
+              leading: const Icon(Icons.restaurant_menu),
+              title: const Text(
+                'QUẢN LÝ THỰC ĐƠN',
+                textAlign: TextAlign.center,
+              ),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.pushNamed(context, '/menu-management');
+              },
+            ),
             const Divider(),
             ListTile(
               title: Text(
