@@ -65,6 +65,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     }
   }
 
+  String _formatDuration(double totalHours) {
+    final seconds = (totalHours * 3600).round();
+    final duration = Duration(seconds: seconds);
+    final h = duration.inHours.toString().padLeft(2, '0');
+    final m = (duration.inMinutes % 60).toString().padLeft(2, '0');
+    final s = (duration.inSeconds % 60).toString().padLeft(2, '0');
+    return '$h:$m:$s';
+  }
+
   Future<void> _completePayment() async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -133,7 +142,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
       final session = _checkoutData!['session'] as Map<String, dynamic>?;
       final table = _checkoutData!['table'] as Map<String, dynamic>?;
-      final orders = _checkoutData!['orders'] as List?;
+      // Fix: Get orders from session if not at root
+      final orders = (_checkoutData!['orders'] ?? session?['orders']) as List?;
       
       if (session == null || table == null) return;
 
@@ -189,7 +199,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       
       // Print Table & Hours
       await printer.printLeftRight('Ban:', table['name'] ?? 'N/A', 0);
-      await printer.printLeftRight('Tong gio:', '${totalHours.toStringAsFixed(2)}h', 0);
+      await printer.printLeftRight('Tong gio:', _formatDuration(totalHours.toDouble()), 0);
       await printer.printCustom('--------------------------------', 0, 1);
       
       // Print Hourly Charge Breakdown
@@ -198,9 +208,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         _formatCurrency(hourlyCharge.toDouble()),
         0
       );
-      await printer.printCustom(
-        '  ${totalHours.toStringAsFixed(2)}h x ${_formatCurrency(hourlyRate.toDouble())}',
-        0, 
+      await printer.printLeftRight(
+        '  ${_formatDuration(totalHours.toDouble())}',
+        'x ${_formatCurrency(hourlyRate.toDouble())}',
         0
       );
       
