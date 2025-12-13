@@ -32,6 +32,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     
     try {
       final data = await TableService.previewCheckout(widget.table.id);
+      print('📦 Checkout data received: ${data.keys}');
+      print('📦 Orders in data: ${data['orders']}');
+      print('📦 Session orders: ${data['session']?['orders']}');
       if (mounted) {
         setState(() {
           _checkoutData = data;
@@ -365,7 +368,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     try {
       final session = _checkoutData!['session'] as Map<String, dynamic>?;
       final table = _checkoutData!['table'] as Map<String, dynamic>?;
-      final orders = _checkoutData!['orders'] as List?;
+      // Get orders from root level (preferred) or from session
+      final orders = _checkoutData!['orders'] as List? ?? session?['orders'] as List?;
+      print('🔍 Display orders: ${orders?.length ?? 0} orders found');
       
       if (session == null || table == null) {
         return Scaffold(
