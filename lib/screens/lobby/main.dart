@@ -11,6 +11,7 @@ import '../../models/floor.dart' as ApiFloor;
 import '../../models/table_model.dart';
 import '../../services/floor_service.dart';
 import '../../services/table_service.dart';
+import '../../services/auth_service.dart';
 import './table_icon.dart';
 import './table_action_dialog.dart';
 import '../../common/common.dart';
@@ -209,6 +210,34 @@ class LobbyScreen extends HookWidget {
                 textAlign: TextAlign.center,
               ),
               onTap: () => Navigator.pushNamed(context, '/expense'),
+            ),
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.people),
+              title: const Text(
+                'QUẢN LÝ USER',
+                textAlign: TextAlign.center,
+              ),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.pushNamed(context, '/user-management');
+              },
+            ),
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.logout, color: Colors.red),
+              title: const Text(
+                'ĐĂNG XUẤT',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.red),
+              ),
+              onTap: () async {
+                Navigator.pop(context);
+                await AuthService.logout();
+                if (context.mounted) {
+                  Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+                }
+              },
             ),
           ],
         );
