@@ -58,7 +58,32 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   String _formatDateTime(dynamic dateTime) {
     if (dateTime == null) return '-';
     try {
-      final dt = DateTime.parse(dateTime.toString());
+      String dateStr = dateTime.toString();
+      
+      // If it's in format "YYYY-MM-DDTHH:mm:ss" (without timezone), parse as local time
+      // Backend now returns this format to avoid timezone conversion issues
+      if (dateStr.contains('T') && !dateStr.contains('+') && !dateStr.contains('Z')) {
+        // Format: "2025-12-14T01:59:00" - parse as local time components
+        final parts = dateStr.split('T');
+        if (parts.length == 2) {
+          final datePart = parts[0].split('-');
+          final timePart = parts[1].split(':');
+          if (datePart.length == 3 && timePart.length >= 2) {
+            // Parse directly as local time (no timezone conversion)
+            final year = int.parse(datePart[0]);
+            final month = int.parse(datePart[1]);
+            final day = int.parse(datePart[2]);
+            final hour = int.parse(timePart[0]);
+            final minute = int.parse(timePart[1]);
+            
+            return '${day.toString().padLeft(2, '0')}/${month.toString().padLeft(2, '0')}/${year} ${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}';
+          }
+        }
+      }
+      
+      // Fallback: parse as ISO string (may have timezone)
+      final dt = DateTime.parse(dateStr);
+      // Use local time components to avoid timezone conversion
       return '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
     } catch (e) {
       return dateTime.toString();
@@ -375,8 +400,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                         style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                       ),
                       const Divider(),
-                      _buildInfoRow('Giờ vào', _formatDateTime(session['startTime'])),
-                      _buildInfoRow('Tổng giờ', '${totalHours.toStringAsFixed(2)} giờ'),
+                      _buildInfoRow(
+                        'Giờ vào', 
+                        _formatDateTime(session['startTime'])
+                      ),
+                      _buildInfoRow(
+                        'Tổng giờ', 
+                        _formatDuration(totalHours.toDouble())
+                      ),
                     ],
                   ),
                 ),
@@ -395,7 +426,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       const Divider(),
                       _buildInfoRow(
                         'Tiền bàn',
-                        '${totalHours.toStringAsFixed(2)} giờ × ${_formatCurrency(hourlyRate.toDouble())}/giờ',
+                        '${_formatDuration(totalHours.toDouble())} × ${_formatCurrency(hourlyRate.toDouble())}/giờ',
                       ),
                       _buildInfoRow('', _formatCurrency(hourlyCharge.toDouble())),
                       if (orders != null && orders.isNotEmpty) ...[
@@ -415,7 +446,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
                                   Expanded(
-                                    child: Text('${dish?['name'] ?? 'N/A'} x$quantity'),
+                                    child: Text('${dish?['name'] ?? 'N/A'} (x$quantity)'),
                                   ),
                                   Text(_formatCurrency(total)),
                                 ],

@@ -16,7 +16,33 @@ class TableActionDialog extends StatelessWidget {
 
   Future<void> _bookTable(BuildContext context) async {
     try {
-      await TableService.book(table.id);
+      // Tự động lấy giờ hiện tại từ máy client
+      final clientTime = DateTime.now();
+      
+      // Show confirmation với giờ hiện tại
+      if (!context.mounted) return;
+      final confirm = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Xác nhận đặt bàn'),
+          content: Text('Đặt bàn ${table.name} lúc ${_formatDateTime(clientTime, showDate: true)}?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Hủy'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Đặt bàn'),
+            ),
+          ],
+        ),
+      );
+
+      if (confirm != true) return;
+
+      // Gửi giờ hiện tại của client lên server
+      await TableService.book(table.id, startTime: clientTime);
       
       if (!context.mounted) return;
       
@@ -32,11 +58,11 @@ class TableActionDialog extends StatelessWidget {
         );
       }
     } catch (e) {
-      if (!context.mounted) return;
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Lỗi: ${e.toString()}')),
-      );
+      if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Lỗi: ${e.toString()}')),
+          );
+      }
     }
   }
 
@@ -103,7 +129,10 @@ class TableActionDialog extends StatelessWidget {
         )}đ';
   }
 
-  String _formatDateTime(DateTime dt) {
+  String _formatDateTime(DateTime dt, {bool showDate = false}) {
+    if (showDate) {
+      return '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+    }
     return '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
   }
 

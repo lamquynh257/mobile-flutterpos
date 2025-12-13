@@ -82,11 +82,11 @@ class TableService {
   }
   
   // Book table (start session)
-  static Future<Map<String, dynamic>> book(int id) async {
+  static Future<Map<String, dynamic>> book(int id, {DateTime? startTime}) async {
     final response = await ApiService.post(
       '/tables/$id/book',
       {
-        'startTime': DateTime.now().toIso8601String(), // Send client's local time
+        'startTime': (startTime ?? DateTime.now()).toIso8601String(), // Send client's local time or selected time
       },
     );
     return ApiService.handleResponse(response);
