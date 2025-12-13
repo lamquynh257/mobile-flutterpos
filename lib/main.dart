@@ -16,6 +16,8 @@ import 'screens/management/floor_management_screen.dart';
 import 'screens/management/table_management_screen.dart';
 import 'screens/checkout/checkout_screen.dart';
 import 'screens/menu/menu_management_screen.dart';
+import 'screens/order/order_food_screen.dart'; // ModernOrderScreen
+import 'screens/order_details/main.dart';
 import 'services/auth_service.dart';
 import 'models/floor.dart';
 import 'models/table_model.dart';
@@ -123,6 +125,11 @@ class PosApp extends StatelessWidget {
             );
           case '/menu-management':
             return MaterialPageRoute(builder: (_) => const MenuManagementScreen());
+          case '/order-details':
+            final table = settings.arguments as TableModel;
+            return MaterialPageRoute(
+              builder: (_) => ModernOrderScreen(table: table),
+            );
           case '/history':
             return routeBuilder(
               DefaultTabController(

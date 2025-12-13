@@ -3,10 +3,11 @@ const prisma = require('../config/database');
 // Get all orders (with filters)
 exports.getAll = async (req, res) => {
     try {
-        const { tableId, status, startDate, endDate } = req.query;
+        const { tableId, tableSessionId, status, startDate, endDate } = req.query;
 
         const where = {};
         if (tableId) where.tableId = parseInt(tableId);
+        if (tableSessionId) where.tableSessionId = parseInt(tableSessionId);
         if (status) where.status = status;
         if (startDate || endDate) {
             where.createdAt = {};

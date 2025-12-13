@@ -87,8 +87,13 @@ class ApiService {
       if (response.body.isEmpty) return null;
       return json.decode(response.body);
     } else {
-      final error = json.decode(response.body);
-      throw Exception(error['error'] ?? 'Request failed');
+      try {
+        final error = json.decode(response.body);
+        throw Exception(error['error'] ?? 'Request failed');
+      } catch (e) {
+        // If response body is not valid JSON, throw with status code
+        throw Exception('Request failed with status ${response.statusCode}');
+      }
     }
   }
 }

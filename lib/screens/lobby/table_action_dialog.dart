@@ -15,12 +15,23 @@ class TableActionDialog extends StatelessWidget {
   Future<void> _bookTable(BuildContext context) async {
     try {
       await TableService.book(table.id);
+      
+      if (!context.mounted) return;
+      
+      // Close dialog first
       Navigator.pop(context);
+      
+      // Then refresh and show message
       onRefresh();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Đã đặt ${table.name}')),
-      );
+      
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Đã đặt ${table.name}')),
+        );
+      }
     } catch (e) {
+      if (!context.mounted) return;
+      
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Lỗi: ${e.toString()}')),
       );
@@ -180,7 +191,19 @@ class TableActionDialog extends StatelessWidget {
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(
-                onPressed: () => Navigator.pushNamed(context, '/edit-menu'),
+                onPressed: () async {
+                  Navigator.pop(context); // Close dialog
+                  final result = await Navigator.pushNamed(
+                    context,
+                    '/order-details',
+                    arguments: table,
+                  );
+                  
+                  // Refresh if order was placed
+                  if (result == true) {
+                    onRefresh();
+                  }
+                },
                 icon: const Icon(Icons.restaurant_menu),
                 label: const Text('Gọi món'),
                 style: OutlinedButton.styleFrom(

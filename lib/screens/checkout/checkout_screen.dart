@@ -163,8 +163,101 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       ),
                     ),
                     const Divider(),
-                    _buildInfoRow('Tiền bàn (giờ)', _formatCurrency(hourlyCharge)),
-                    _buildInfoRow('Tiền món ăn', _formatCurrency(orderTotal)),
+                    // Hourly charge with breakdown
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Tiền bàn (giờ)',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w500,
+                                fontSize: 14,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '${(session['totalHours'] ?? 0).toStringAsFixed(2)} giờ × ${_formatCurrency((_checkoutData!['table']?['hourlyRate'] ?? 0.0) as double)}/giờ',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey.shade600,
+                              ),
+                            ),
+                          ],
+                        ),
+                        Text(
+                          _formatCurrency(hourlyCharge),
+                          style: const TextStyle(fontSize: 14),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    // Order items details
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Tiền món ăn',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w500,
+                            fontSize: 14,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        // List all dishes
+                        ...(_checkoutData!['orders'] as List? ?? []).expand((order) {
+                          final items = order['items'] as List? ?? [];
+                          return items.map((item) {
+                            final dishName = item['dish']?['name'] ?? 'Unknown';
+                            final quantity = item['quantity'] ?? 0;
+                            final price = (item['price'] ?? 0.0) as num;
+                            final itemTotal = price * quantity;
+                            
+                            return Padding(
+                              padding: const EdgeInsets.only(left: 16, bottom: 4),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      '$dishName × $quantity',
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        color: Colors.grey.shade700,
+                                      ),
+                                    ),
+                                  ),
+                                  Text(
+                                    _formatCurrency(itemTotal.toDouble()),
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: Colors.grey.shade700,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }).toList();
+                        }).toList(),
+                        const SizedBox(height: 8),
+                        // Order total
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(''),
+                            Text(
+                              _formatCurrency(orderTotal),
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                     const Divider(),
                     _buildInfoRow(
                       'TỔNG CỘNG',

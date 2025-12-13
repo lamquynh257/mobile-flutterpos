@@ -195,17 +195,6 @@ class LobbyScreen extends HookWidget {
                 Navigator.pushNamed(context, '/floor-management');
               },
             ),
-            ListTile(
-              leading: const Icon(Icons.restaurant_menu),
-              title: const Text(
-                'QUẢN LÝ THỰC ĐƠN',
-                textAlign: TextAlign.center,
-              ),
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.pushNamed(context, '/menu-management');
-              },
-            ),
             const Divider(),
             ListTile(
               title: Text(
@@ -303,12 +292,29 @@ class _FloorTabViewState extends State<_FloorTabView>
     }
   }
 
+  // Update single table without reloading all
+  Future<void> _updateSingleTable(int tableId) async {
+    try {
+      final updatedTable = await TableService.getById(tableId);
+      setState(() {
+        final index = _tables.indexWhere((t) => t.id == tableId);
+        if (index != -1) {
+          _tables[index] = updatedTable;
+        }
+      });
+    } catch (e) {
+      print('❌ Error updating table: $e');
+      // Fallback to full reload if single update fails
+      _loadTables();
+    }
+  }
+
   Future<void> _autoArrangeTables(List<TableModel> tables) async {
     // Arrange tables in a grid pattern
     const double startX = 20;
     const double startY = 20;
     const double spacing = 100;
-    const int tablesPerRow = 4;
+    const int tablesPerRow = 6; // Changed from 4 to 6 columns
 
     print('🎨 Starting auto-arrange for ${tables.length} tables');
     for (int i = 0; i < tables.length; i++) {
@@ -391,83 +397,78 @@ class _FloorTabViewState extends State<_FloorTabView>
       );
     }
 
-    return InteractiveViewer(
-      maxScale: 2.0,
-      transformationController: transformController,
-      child: Stack(
-        children: [
-          Container(key: bgKey),
-          for (var table in _tables)
-            Positioned(
-              left: table.x,
-              top: table.y,
-              child: GestureDetector(
-                onTap: () async {
-                  final result = await showDialog(
-                    context: context,
-                    builder: (context) => TableActionDialog(
-                      table: table,
-                      onRefresh: _loadTables,
-                    ),
-                  );
-                  
-                  // Refresh if dialog returned true (after checkout)
-                  if (result == true) {
-                    _loadTables();
-                  }
-                },
-                child: Container(
-                  width: 80,
-                  height: 80,
-                  decoration: BoxDecoration(
-                    color: _getTableColor(table.status),
-                    borderRadius: BorderRadius.circular(8),
-                    boxShadow: const [
-                      BoxShadow(
-                        color: Colors.black26,
-                        blurRadius: 4,
-                        offset: Offset(2, 2),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(Icons.table_restaurant, color: Colors.white, size: 20),
-                      const SizedBox(height: 4),
-                      Text(
-                        table.name,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 12,
-                        ),
-                      ),
-                      if (table.isOccupied && table.elapsedTime != null) ...[
-                        const SizedBox(height: 2),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: Colors.black26,
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            _formatElapsedTime(table.elapsedTime),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
+    // Use GridView for automatic 6-column layout
+    return GridView.builder(
+      padding: const EdgeInsets.all(16),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 6, // 6 columns
+        childAspectRatio: 1.0,
+        crossAxisSpacing: 16,
+        mainAxisSpacing: 16,
+      ),
+      itemCount: _tables.length,
+      itemBuilder: (context, index) {
+        final table = _tables[index];
+        
+        return GestureDetector(
+          onTap: () async {
+            await showDialog(
+              context: context,
+              builder: (context) => TableActionDialog(
+                table: table,
+                onRefresh: () => _updateSingleTable(table.id),
+              ),
+            );
+            // No need to reload - onRefresh already called in dialog
+          },
+          child: Container(
+            decoration: BoxDecoration(
+              color: _getTableColor(table.status),
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: const [
+                BoxShadow(
+                  color: Colors.black26,
+                  blurRadius: 4,
+                  offset: Offset(2, 2),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.table_restaurant, color: Colors.white, size: 32),
+                const SizedBox(height: 8),
+                Text(
+                  table.name,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
                   ),
                 ),
-              ),
+                if (table.isOccupied && table.elapsedTime != null) ...[
+                  const SizedBox(height: 4),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.black26,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      _formatElapsedTime(table.elapsedTime),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
             ),
-        ],
-      ),
+          ),
+        );
+      },
     );
   }
 

@@ -18,7 +18,39 @@ exports.getAll = async (req, res) => {
             orderBy: { id: 'asc' },
         });
 
-        res.json(tables);
+        // Dynamically set status based on active sessions
+        const tablesWithCorrectStatus = tables.map(table => {
+            const hasActiveSession = table.sessions && table.sessions.length > 0;
+            const correctStatus = hasActiveSession ? 'OCCUPIED' : 'EMPTY';
+
+            return {
+                ...table,
+                status: correctStatus, // Return correct status immediately
+            };
+        });
+
+        // Batch update out-of-sync statuses in background (non-blocking)
+        const outOfSyncTables = tables.filter(table => {
+            const hasActiveSession = table.sessions && table.sessions.length > 0;
+            const correctStatus = hasActiveSession ? 'OCCUPIED' : 'EMPTY';
+            return table.status !== correctStatus;
+        });
+
+        if (outOfSyncTables.length > 0) {
+            // Update in background without blocking response
+            Promise.all(
+                outOfSyncTables.map(table => {
+                    const hasActiveSession = table.sessions && table.sessions.length > 0;
+                    const correctStatus = hasActiveSession ? 'OCCUPIED' : 'EMPTY';
+                    return prisma.table.update({
+                        where: { id: table.id },
+                        data: { status: correctStatus },
+                    });
+                })
+            ).catch(err => console.error('Error syncing table statuses:', err));
+        }
+
+        res.json(tablesWithCorrectStatus);
     } catch (error) {
         console.error('Get tables error:', error);
         res.status(500).json({ error: 'Internal server error' });
@@ -52,7 +84,22 @@ exports.getById = async (req, res) => {
             return res.status(404).json({ error: 'Table not found' });
         }
 
-        res.json(table);
+        // Dynamically set status based on active sessions
+        const hasActiveSession = table.sessions && table.sessions.length > 0;
+        const correctStatus = hasActiveSession ? 'OCCUPIED' : 'EMPTY';
+
+        // Sync in background if needed (non-blocking)
+        if (table.status !== correctStatus) {
+            prisma.table.update({
+                where: { id: table.id },
+                data: { status: correctStatus },
+            }).catch(err => console.error('Error syncing table status:', err));
+        }
+
+        res.json({
+            ...table,
+            status: correctStatus,
+        });
     } catch (error) {
         console.error('Get table error:', error);
         res.status(500).json({ error: 'Internal server error' });
@@ -214,6 +261,12 @@ exports.checkout = async (req, res) => {
             },
         });
 
+        // Update all orders in this session to COMPLETED
+        await prisma.order.updateMany({
+            where: { tableSessionId: session.id },
+            data: { status: 'COMPLETED' },
+        });
+
         // Update table status
         await prisma.table.update({
             where: { id: parseInt(id) },
@@ -225,6 +278,11 @@ exports.checkout = async (req, res) => {
             hourlyCharge,
             orderTotal,
             grandTotal: hourlyCharge + orderTotal,
+            orders: session.orders, // Include order details with items
+            table: {
+                hourlyRate: table.hourlyRate,
+                totalHours: totalHours,
+            },
             message: 'Checkout completed',
         });
     } catch (error) {
