@@ -5,10 +5,10 @@ import 'package:intl/intl.dart';
 class Money {
   const Money._();
 
-  static final _fc = NumberFormat('#,###.##');
-  static final _fcFull = NumberFormat.simpleCurrency();
+  static final _fc = NumberFormat('#,###', 'vi_VN');
+  static final _fcFull = NumberFormat.currency(locale: 'vi_VN', symbol: 'đ', decimalDigits: 0);
 
-  static String get symbol => _fc.currencySymbol;
+  static String get symbol => 'đ';
 
   static String format(num price, {bool symbol = false}) {
     return symbol ? _fcFull.format(price) : _fc.format(price);

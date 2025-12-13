@@ -1,7 +1,7 @@
-require('dotenv').config();
-
-// Set timezone to Vietnam (UTC+7)
+// CRITICAL: Set timezone FIRST, before any requires!
 process.env.TZ = 'Asia/Ho_Chi_Minh';
+
+require('dotenv').config();
 
 const express = require('express');
 const cors = require('cors');

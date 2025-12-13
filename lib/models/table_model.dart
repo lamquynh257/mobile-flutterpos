@@ -95,7 +95,7 @@ class TableSession {
     return TableSession(
       id: json['id'] as int,
       tableId: json['tableId'] as int?,  // Nullable
-      startTime: DateTime.parse(json['startTime'] as String),
+      startTime: DateTime.parse(json['startTime'] as String), // Parse as local time
       endTime: json['endTime'] != null ? DateTime.parse(json['endTime'] as String) : null,
       totalHours: json['totalHours'] != null ? (json['totalHours'] as num).toDouble() : null,
       hourlyCharge: json['hourlyCharge'] != null ? (json['hourlyCharge'] as num).toDouble() : null,

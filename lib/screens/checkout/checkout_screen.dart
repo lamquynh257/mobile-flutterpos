@@ -85,12 +85,22 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
 
     if (confirm == true) {
-      // Return true to trigger lobby refresh
-      if (mounted) {
-        Navigator.pop(context, true);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Thanh toán thành công!')),
-        );
+      try {
+        // Call actual checkout API to end session
+        await TableService.checkout(widget.table.id);
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Thanh toán thành công!')),
+          );
+          Navigator.pop(context, true); // Return true to trigger lobby refresh
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Lỗi thanh toán: ${e.toString()}')),
+          );
+        }
       }
     }
   }

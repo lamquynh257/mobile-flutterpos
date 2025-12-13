@@ -132,13 +132,18 @@ class _ListItem extends HookWidget {
       child: FormContent(
         inputs: buildInputs(
             context, dishNameController, priceController, TextAlign.start),
-        avatar: Avatar(
-          imgProvider: pickedImage.value != null
-              ? MemoryImage(pickedImage.value!)
-              : dish.imgProvider,
-          onNew: (image) {
-            pickedImage.value = image;
-          },
+        avatar: Container(
+          width: 100,
+          height: 100,
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.primaryContainer,
+            shape: BoxShape.circle,
+          ),
+          child: Icon(
+            Icons.restaurant_menu,
+            size: 50,
+            color: Theme.of(context).colorScheme.onPrimaryContainer,
+          ),
         ),
         gap: 12.0,
         buttonMinWidth: 70.0,

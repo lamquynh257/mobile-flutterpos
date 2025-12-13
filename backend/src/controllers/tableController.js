@@ -199,7 +199,18 @@ exports.book = async (req, res) => {
 
         // Use client time if provided, otherwise use server time
         if (startTime) {
-            sessionData.startTime = new Date(startTime);
+            // CRITICAL FIX: Extract LOCAL time from ISO string
+            // Input: "2025-12-13T23:26:00.000+07:00"
+            // Extract local components: 23:26
+            // Create Date object that Prisma accepts
+            const match = startTime.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})/);
+            if (match) {
+                const [_, y, m, d, h, min, s] = match;
+                // Create Date using local components (Prisma needs Date object, not string)
+                sessionData.startTime = new Date(parseInt(y), parseInt(m) - 1, parseInt(d), parseInt(h), parseInt(min), parseInt(s));
+            } else {
+                sessionData.startTime = new Date(startTime);
+            }
         }
 
         const session = await prisma.tableSession.create({
@@ -247,8 +258,19 @@ exports.previewCheckout = async (req, res) => {
         }
 
         const session = table.sessions[0];
-        const { getVietnamTime } = require('../utils/timezone');
-        const currentTime = getVietnamTime();
+
+        // Get current time in same format as startTime
+        // startTime is stored as UTC date representing local time
+        // So we need to create currentTime the same way
+        const now = new Date();
+        const y = now.getFullYear();
+        const m = String(now.getMonth() + 1).padStart(2, '0');
+        const d = String(now.getDate()).padStart(2, '0');
+        const h = String(now.getHours()).padStart(2, '0');
+        const min = String(now.getMinutes()).padStart(2, '0');
+        const s = String(now.getSeconds()).padStart(2, '0');
+        const currentTime = new Date(parseInt(y), parseInt(m) - 1, parseInt(d), parseInt(h), parseInt(min), parseInt(s));
+
         const startTime = new Date(session.startTime);
         const totalHours = (currentTime - startTime) / (1000 * 60 * 60);
         const hourlyCharge = totalHours * table.hourlyRate;
@@ -314,10 +336,19 @@ exports.checkout = async (req, res) => {
         }
 
         const session = table.sessions[0];
-        const { getVietnamTime } = require('../utils/timezone');
-        const endTime = getVietnamTime(); // Use Vietnam time
+
+        // Get current time in same format as startTime
+        const now = new Date();
+        const y = now.getFullYear();
+        const m = String(now.getMonth() + 1).padStart(2, '0');
+        const d = String(now.getDate()).padStart(2, '0');
+        const h = String(now.getHours()).padStart(2, '0');
+        const min = String(now.getMinutes()).padStart(2, '0');
+        const s = String(now.getSeconds()).padStart(2, '0');
+        const endTime = new Date(parseInt(y), parseInt(m) - 1, parseInt(d), parseInt(h), parseInt(min), parseInt(s));
+
         const startTime = new Date(session.startTime);
-        const totalHours = (endTime - startTime) / (1000 * 60 * 60); // Convert ms to hours
+        const totalHours = (endTime - startTime) / (1000 * 60 * 60);
         const hourlyCharge = totalHours * table.hourlyRate;
 
         // Calculate order total
