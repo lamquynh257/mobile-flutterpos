@@ -109,6 +109,31 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     return '$h:$m:$s';
   }
 
+  // Helper to format left-right aligned text (max 48 chars per line for thermal printer)
+  String _formatLeftRight(String left, String right, {int maxWidth = 48}) {
+    final leftLen = left.length;
+    final rightLen = right.length;
+    final totalLen = leftLen + rightLen;
+    
+    if (totalLen >= maxWidth) {
+      // If too long, truncate right side
+      final availableForRight = maxWidth - leftLen - 1;
+      if (availableForRight > 0) {
+        final truncatedRight = right.length > availableForRight 
+            ? right.substring(0, availableForRight - 3) + '...'
+            : right;
+        return '$left $truncatedRight';
+      } else {
+        return left.substring(0, maxWidth - 3) + '...';
+      }
+    }
+    
+    // Calculate spaces needed
+    final spacesNeeded = maxWidth - leftLen - rightLen;
+    final spaces = ' ' * spacesNeeded;
+    return '$left$spaces$right';
+  }
+
   // Helper function to print QR code image
   Future<void> _printQrCodeImage(BlueThermalPrinter printer, Uint8List imageBytes) async {
     try {
@@ -340,16 +365,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       await printer.printCustom(_formatDateTime(session['startTime']), 0, 1);
       await printer.printCustom('================================', 1, 1);
       
-      // Print Table & Hours
-      await printer.printLeftRight('Ban:', table['name'] ?? 'N/A', 0);
-      await printer.printLeftRight('Tong gio:', _formatDuration(totalHours.toDouble()), 0);
+      // Print Table & Hours - use printCustom to avoid format issues
+      await printer.printCustom(_formatLeftRight('Ban:', table['name'] ?? 'N/A'), 0, 0);
+      await printer.printCustom(_formatLeftRight('Tong gio:', _formatDuration(totalHours.toDouble())), 0, 0);
       await printer.printCustom('--------------------------------', 0, 1);
       
       // Print Hourly Charge Breakdown
-      // Print Hourly Charge - use printCustom to avoid format issues
-      await printer.printCustom('Tien ban: ${_formatCurrency(hourlyCharge.toDouble())}', 0, 0);
+      await printer.printCustom(_formatLeftRight('Tien ban:', _formatCurrency(hourlyCharge.toDouble())), 0, 0);
       await printer.printCustom(
-        '  ${_formatDuration(totalHours.toDouble())} x ${_formatCurrency(hourlyRate.toDouble())}',
+        _formatLeftRight('  ${_formatDuration(totalHours.toDouble())}', 'x ${_formatCurrency(hourlyRate.toDouble())}'),
         0,
         0
       );
@@ -357,7 +381,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       // Print Food Items
       if (orders != null && orders.isNotEmpty) {
         await printer.printCustom('--------------------------------', 0, 1);
-        await printer.printLeftRight('Mon an:', '', 1); // Bold, Left aligned with other labels
+        await printer.printCustom('Mon an:', 1, 0); // Bold, Left aligned
         
         for (final order in orders) {
           final items = order['items'] as List? ?? [];
@@ -367,21 +391,21 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             final price = (item['price'] ?? 0.0) as num;
             final total = quantity * price.toDouble();
             
-            await printer.printLeftRight(
-              '${dish?['name'] ?? 'N/A'} (x$quantity)',
-              _formatCurrency(total),
+            await printer.printCustom(
+              _formatLeftRight('${dish?['name'] ?? 'N/A'} (x$quantity)', _formatCurrency(total)),
+              0,
               0,
             );
           }
         }
         
         await printer.printCustom('--------------------------------', 0, 1);
-        await printer.printLeftRight('Tong mon:', _formatCurrency(orderTotal.toDouble()), 1);
+        await printer.printCustom(_formatLeftRight('Tong mon:', _formatCurrency(orderTotal.toDouble())), 1, 0);
       }
       
       // Print Total
       await printer.printCustom('================================', 1, 1);
-      await printer.printLeftRight('TONG CONG:', _formatCurrency(grandTotal.toDouble()), 2); // Size 2
+      await printer.printCustom(_formatLeftRight('TONG CONG:', _formatCurrency(grandTotal.toDouble())), 2, 0); // Size 2, left aligned
       await printer.printCustom('================================', 1, 1);
       
       // Print QR Code if available (before thank you message)
