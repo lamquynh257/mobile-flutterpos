@@ -87,7 +87,7 @@ class TableActionDialog extends StatelessWidget {
                   const Divider(),
                   const Text('Session hiện tại:', style: TextStyle(fontWeight: FontWeight.bold)),
                   const SizedBox(height: 8),
-                  _buildInfoRow('Giờ vào', _formatDateTime(tableDetail.activeSession!.startTime)),
+                  _buildInfoRow('Giờ vào', _formatDateTime(tableDetail.activeSession!.startTime, showDate: true)),
                   _buildInfoRow('Đã chơi', '${tableDetail.elapsedTime?.inMinutes ?? 0} phút'),
                   _buildInfoRow('Tiền giờ hiện tại', _formatCurrency(tableDetail.currentHourlyCharge)),
                 ],
