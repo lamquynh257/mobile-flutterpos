@@ -5,6 +5,7 @@ import '../../models/order.dart' as OrderModel;
 import '../../provider/src.dart';
 import '../../services/api_service.dart';
 import '../../services/table_service.dart';
+import '../../theme/rally.dart';
 
 class ModernOrderScreen extends StatefulWidget {
   final TableModel table;
@@ -216,9 +217,10 @@ class _ModernOrderScreenState extends State<ModernOrderScreen> {
 
     if (menuSupplier.loading || _isLoading) {
       return Scaffold(
-        appBar: AppBar(
-          title: Text('Gọi món - ${widget.table.name}'),
-          backgroundColor: Colors.orange,
+      appBar: AppBar(
+        title: Text('Gọi món - ${widget.table.name}'),
+        backgroundColor: RallyColors.primaryBackground,
+        foregroundColor: Colors.white,
         ),
         body: const Center(child: CircularProgressIndicator()),
       );
@@ -231,7 +233,8 @@ class _ModernOrderScreenState extends State<ModernOrderScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text('Gọi món - ${table.name}'),
-        backgroundColor: Colors.orange,
+        backgroundColor: RallyColors.primaryBackground,
+        foregroundColor: Colors.white,
         actions: [
           if (cartItemCount > 0)
             Padding(
@@ -240,17 +243,17 @@ class _ModernOrderScreenState extends State<ModernOrderScreen> {
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: RallyColors.primaryColor,
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.shopping_cart, color: Colors.orange, size: 20),
+                      const Icon(Icons.shopping_cart, color: Colors.white, size: 20),
                       const SizedBox(width: 4),
                       Text(
                         '$cartItemCount',
                         style: const TextStyle(
-                          color: Colors.orange,
+                          color: Colors.white,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -266,105 +269,110 @@ class _ModernOrderScreenState extends State<ModernOrderScreen> {
           // Menu grid
           Expanded(
             flex: 2,
-            child: menu.isEmpty
-                ? const Center(child: Text('Chưa có món nào'))
-                : GridView.builder(
-                    padding: const EdgeInsets.all(16),
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 3,
-                      childAspectRatio: 0.8,
-                      crossAxisSpacing: 16,
-                      mainAxisSpacing: 16,
-                    ),
-                    itemCount: menu.length,
-                    itemBuilder: (context, index) {
-                      final dish = menu[index];
-                      final inCart = _cart[dish.id] ?? 0;
+            child: Container(
+              color: const Color(0xFF33333D), // Dark background matching app theme
+              child: menu.isEmpty
+                  ? const Center(child: Text('Chưa có món nào', style: TextStyle(color: Colors.white)))
+                  : GridView.builder(
+                      padding: const EdgeInsets.all(16),
+                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 3,
+                        childAspectRatio: 0.8,
+                        crossAxisSpacing: 16,
+                        mainAxisSpacing: 16,
+                      ),
+                      itemCount: menu.length,
+                      itemBuilder: (context, index) {
+                        final dish = menu[index];
+                        final inCart = _cart[dish.id] ?? 0;
 
-                      return Card(
-                        elevation: 4,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: InkWell(
-                          onTap: () => _updateQuantity(dish.id, 1),
-                          borderRadius: BorderRadius.circular(12),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              Expanded(
-                                child: Stack(
-                                  children: [
-                                    Container(
-                                      decoration: BoxDecoration(
-                                        borderRadius: const BorderRadius.vertical(
-                                          top: Radius.circular(12),
-                                        ),
-                                        color: Theme.of(context).colorScheme.primaryContainer,
-                                      ),
-                                      child: Center(
-                                        child: Icon(
-                                          Icons.restaurant_menu,
-                                          size: 60,
-                                          color: Theme.of(context).colorScheme.onPrimaryContainer,
-                                        ),
-                                      ),
-                                    ),
-                                    if (inCart > 0)
-                                      Positioned(
-                                        top: 8,
-                                        right: 8,
-                                        child: Container(
-                                          padding: const EdgeInsets.all(8),
-                                          decoration: const BoxDecoration(
-                                            color: Colors.orange,
-                                            shape: BoxShape.circle,
+                        return Card(
+                          elevation: 4,
+                          color: const Color(0xFF42424D), // Dark card background
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: InkWell(
+                            onTap: () => _updateQuantity(dish.id, 1),
+                            borderRadius: BorderRadius.circular(12),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Expanded(
+                                  child: Stack(
+                                    children: [
+                                      Container(
+                                        decoration: BoxDecoration(
+                                          borderRadius: const BorderRadius.vertical(
+                                            top: Radius.circular(12),
                                           ),
-                                          child: Text(
-                                            '$inCart',
-                                            style: const TextStyle(
-                                              color: Colors.white,
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 16,
+                                          color: Colors.deepPurple.shade700, // Purple background for icon
+                                        ),
+                                        child: Center(
+                                          child: Icon(
+                                            Icons.restaurant_menu,
+                                            size: 60,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                      ),
+                                      if (inCart > 0)
+                                        Positioned(
+                                          top: 8,
+                                          right: 8,
+                                          child: Container(
+                                            padding: const EdgeInsets.all(8),
+                                            decoration: const BoxDecoration(
+                                              color: Colors.orange,
+                                              shape: BoxShape.circle,
+                                            ),
+                                            child: Text(
+                                              '$inCart',
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 16,
+                                              ),
                                             ),
                                           ),
                                         ),
-                                      ),
-                                  ],
+                                    ],
+                                  ),
                                 ),
-                              ),
-                              Padding(
-                                padding: const EdgeInsets.all(12),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      dish.dish,
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 16,
+                                Padding(
+                                  padding: const EdgeInsets.all(12),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        dish.dish,
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 16,
+                                          color: Colors.white,
+                                        ),
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
                                       ),
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      _formatCurrency(dish.price),
-                                      style: const TextStyle(
-                                        color: Colors.green,
-                                        fontWeight: FontWeight.w600,
-                                        fontSize: 14,
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        _formatCurrency(dish.price),
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 14,
+                                        ),
                                       ),
-                                    ),
-                                  ],
+                                    ],
+                                  ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
-                        ),
-                      );
-                    },
-                  ),
+                        );
+                      },
+                    ),
+            ),
           ),
           // Cart sidebar
           Container(
@@ -383,7 +391,7 @@ class _ModernOrderScreenState extends State<ModernOrderScreen> {
               children: [
                 Container(
                   padding: const EdgeInsets.all(16),
-                  color: Colors.orange,
+                  color: RallyColors.primaryBackground,
                   child: Row(
                     children: [
                       const Icon(Icons.shopping_cart, color: Colors.white),
@@ -404,13 +412,13 @@ class _ModernOrderScreenState extends State<ModernOrderScreen> {
                             vertical: 4,
                           ),
                           decoration: BoxDecoration(
-                            color: Colors.white,
+                            color: RallyColors.primaryColor,
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Text(
                             '$cartItemCount món',
                             style: const TextStyle(
-                              color: Colors.orange,
+                              color: Colors.white,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
@@ -599,7 +607,7 @@ class _ModernOrderScreenState extends State<ModernOrderScreen> {
                               style: const TextStyle(fontSize: 16),
                             ),
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.orange,
+                              backgroundColor: RallyColors.buttonColor,
                               foregroundColor: Colors.white,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(8),
