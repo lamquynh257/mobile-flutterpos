@@ -220,31 +220,34 @@ class TableActionDialog extends StatelessWidget {
               ),
               const SizedBox(height: 12),
             ],
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: () async {
-                  Navigator.pop(context); // Close dialog
-                  final result = await Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => ModernOrderScreen(table: table),
-                    ),
-                  );
-                  
-                  // Refresh if order was placed
-                  if (result == true) {
-                    onRefresh();
-                  }
-                },
-                icon: const Icon(Icons.restaurant_menu),
-                label: const Text('Gọi món'),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.all(16),
+            // Chỉ hiển thị nút "Gọi món" khi bàn không trống (đang sử dụng hoặc đã đặt)
+            if (!isEmpty) ...[
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () async {
+                    Navigator.pop(context); // Close dialog
+                    final result = await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ModernOrderScreen(table: table),
+                      ),
+                    );
+                    
+                    // Refresh if order was placed
+                    if (result == true) {
+                      onRefresh();
+                    }
+                  },
+                  icon: const Icon(Icons.restaurant_menu),
+                  label: const Text('Gọi món'),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.all(16),
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 12),
+              const SizedBox(height: 12),
+            ],
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(

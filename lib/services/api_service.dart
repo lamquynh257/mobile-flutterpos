@@ -35,14 +35,27 @@ class ApiService {
   
   // GET request
   static Future<http.Response> get(String endpoint) async {
-    final token = await getToken();
-    final headers = {
-      'Content-Type': 'application/json',
-      if (token != null) 'Authorization': 'Bearer $token',
-    };
-    
-    final url = Uri.parse('$baseUrl$endpoint');
-    return await http.get(url, headers: headers);
+    try {
+      final token = await getToken();
+      final headers = {
+        'Content-Type': 'application/json',
+        if (token != null) 'Authorization': 'Bearer $token',
+      };
+      
+      final url = Uri.parse('$baseUrl$endpoint');
+      print('🌐 API GET: $url');
+      final response = await http.get(url, headers: headers).timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          throw Exception('Request timeout');
+        },
+      );
+      print('📦 Response status: ${response.statusCode}');
+      return response;
+    } catch (e) {
+      print('❌ API GET error: $e');
+      rethrow;
+    }
   }
   
   // POST request

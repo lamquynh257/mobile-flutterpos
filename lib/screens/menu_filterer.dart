@@ -61,16 +61,39 @@ class _MenuList extends HookWidget {
 
   @override
   Widget build(BuildContext context) {
-    final loading = context.select((MenuSupplier supplier) => supplier.loading);
+    final supplier = context.watch<MenuSupplier>();
+    final loading = supplier.loading;
+    final dishes = supplier.menu.toList();
+    
     if (loading) {
-      return const CircularProgressIndicator(
-        valueColor: AlwaysStoppedAnimation<Color>(Colors.green),
+      return const Center(
+        child: CircularProgressIndicator(
+          valueColor: AlwaysStoppedAnimation<Color>(Colors.green),
+        ),
       );
     }
-    final dishes = context.select((MenuSupplier supplier) => supplier.menu.toList());
+    
     if (dishes.isEmpty) {
-      return Text(AppLocalizations.of(context)?.generic_empty ?? 'No data found');
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.restaurant_menu, size: 64, color: Colors.grey),
+            const SizedBox(height: 16),
+            Text(
+              AppLocalizations.of(context)?.generic_empty ?? 'No data found',
+              style: const TextStyle(fontSize: 16, color: Colors.grey),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Vui lòng kiểm tra kết nối mạng và thử lại',
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+          ],
+        ),
+      );
     }
+    
     return Expanded(child: builder(dishes));
   }
 }

@@ -437,12 +437,68 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       if (orders != null && orders.isNotEmpty) ...[
                         const SizedBox(height: 8),
                         const Text('Món ăn:', style: TextStyle(fontWeight: FontWeight.w500)),
-                        ...orders.expand((order) {
-                          final items = order['items'] as List? ?? [];
-                          return items.map<Widget>((item) {
-                            final dish = item['dish'] as Map<String, dynamic>?;
-                            final quantity = (item['quantity'] ?? 0) as int;
-                            final price = (item['price'] ?? 0.0) as num;
+                        ...() {
+                          // CHỈ lấy PENDING orders (bỏ qua CANCELLED và COMPLETED)
+                          final pendingOrders = orders.where((order) {
+                            final status = order['status'] as String?;
+                            return status == 'PENDING';
+                          }).toList();
+                          
+                          print('📋 Total orders: ${orders.length}, PENDING orders: ${pendingOrders.length}');
+                          
+                          // Gộp tất cả items từ PENDING orders lại theo dishId
+                          final Map<int, Map<String, dynamic>> groupedItems = {};
+                          
+                          for (var order in pendingOrders) {
+                            final orderId = order['id'] as int?;
+                            final items = order['items'] as List? ?? [];
+                            print('📦 Processing order $orderId with ${items.length} items');
+                            
+                            for (var item in items) {
+                              final dish = item['dish'] as Map<String, dynamic>?;
+                              final dishId = dish?['id'] as int?;
+                              final dishName = dish?['name'] as String?;
+                              final quantity = (item['quantity'] ?? 0) as int;
+                              final price = (item['price'] ?? 0.0) as num;
+                              
+                              print('  ➕ Item: $dishName (id: $dishId) x$quantity @ ${price}đ');
+                              
+                              if (dishId != null) {
+                                if (groupedItems.containsKey(dishId)) {
+                                  // Cộng dồn quantity nếu dish đã tồn tại
+                                  final existing = groupedItems[dishId]!;
+                                  final existingQty = existing['quantity'] as int;
+                                  final newQty = existingQty + quantity;
+                                  groupedItems[dishId] = {
+                                    'dish': dish,
+                                    'quantity': newQty,
+                                    'price': price, // Giữ giá từ item đầu tiên
+                                  };
+                                  print('    📊 Updated: $dishName from $existingQty to $newQty');
+                                } else {
+                                  // Thêm dish mới
+                                  groupedItems[dishId] = {
+                                    'dish': dish,
+                                    'quantity': quantity,
+                                    'price': price,
+                                  };
+                                  print('    ✨ Added: $dishName x$quantity');
+                                }
+                              }
+                            }
+                          }
+                          
+                          print('🛒 Final grouped items: ${groupedItems.length} unique dishes');
+                          for (var entry in groupedItems.entries) {
+                            final dish = entry.value['dish'] as Map<String, dynamic>?;
+                            print('  - ${dish?['name']}: x${entry.value['quantity']}');
+                          }
+                          
+                          // Chuyển đổi thành list widgets để hiển thị
+                          return groupedItems.values.map<Widget>((itemData) {
+                            final dish = itemData['dish'] as Map<String, dynamic>?;
+                            final quantity = itemData['quantity'] as int;
+                            final price = (itemData['price'] ?? 0.0) as num;
                             final total = quantity * price.toDouble();
                             
                             return Padding(
@@ -457,8 +513,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                 ],
                               ),
                             );
-                          });
-                        }).toList(),
+                          }).toList();
+                        }(),
                         const Divider(),
                         _buildInfoRow('Tổng món ăn', _formatCurrency(orderTotal.toDouble())),
                       ],

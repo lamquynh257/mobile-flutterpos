@@ -23,6 +23,20 @@ class EditMenuScreen extends StatefulWidget {
 class EditMenuScreenState extends State<EditMenuScreen> {
   // New code
   final ScrollController _scrollController = ScrollController();
+  bool _hasReloaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Reload menu data when entering EditMenuScreen to ensure fresh data from database
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_hasReloaded && mounted) {
+        _hasReloaded = true;
+        final supplier = context.read<MenuSupplier>();
+        supplier.reload();
+      }
+    });
+  }
 
   @override
   dispose() {

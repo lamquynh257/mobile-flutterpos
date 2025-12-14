@@ -4,6 +4,7 @@ import '../../models/table_model.dart';
 import '../../models/order.dart' as OrderModel;
 import '../../provider/src.dart';
 import '../../services/api_service.dart';
+import '../../services/table_service.dart';
 
 class ModernOrderScreen extends StatefulWidget {
   final TableModel table;
@@ -18,49 +19,81 @@ class _ModernOrderScreenState extends State<ModernOrderScreen> {
   final Map<int, int> _cart = {}; // dishId -> quantity
   bool _isSubmitting = false;
   bool _isLoading = true;
+  TableModel? _currentTable; // Store refreshed table data
 
   @override
   void initState() {
     super.initState();
-    _loadExistingOrders();
+    _loadTableAndOrders();
   }
 
-  Future<void> _loadExistingOrders() async {
+  /// Reload table data from server and then load orders
+  /// This ensures we have the latest table session information
+  Future<void> _loadTableAndOrders() async {
     setState(() => _isLoading = true);
     try {
-      int? sessionId = widget.table.activeSession?.id;
+      // Step 1: Reload table data from server to get latest session info
+      print('🔄 Reloading table ${widget.table.id} data...');
+      final refreshedTable = await TableService.getById(widget.table.id);
+      print('✅ Table reloaded: sessionId=${refreshedTable.activeSession?.id}');
       
-      // Debug: Loading orders for table ${widget.table.id}, sessionId: $sessionId
+      setState(() {
+        _currentTable = refreshedTable;
+      });
+      
+      // Step 2: Load orders based on refreshed table data
+      await _loadExistingOrders(refreshedTable);
+    } catch (e) {
+      print('❌ Error loading table data: $e');
+      // Fallback to using original table data
+      setState(() {
+        _currentTable = widget.table;
+      });
+      await _loadExistingOrders(widget.table);
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _loadExistingOrders(TableModel table) async {
+    try {
+      int? sessionId = table.activeSession?.id;
+      
+      print('📋 Loading orders for table ${table.id}, sessionId: $sessionId');
       
       // Only load if table has an active session (endTime is null)
-      if (sessionId != null && widget.table.activeSession?.endTime == null) {
+      if (sessionId != null && table.activeSession?.endTime == null) {
         final response = await ApiService.get('/orders?tableSessionId=$sessionId&status=PENDING');
         final data = ApiService.handleResponse(response);
         
         final orders = (data as List).map((json) => OrderModel.Order.fromJson(json)).toList();
-        // Debug: Found ${orders.length} pending orders
+        print('✅ Found ${orders.length} pending orders');
+        
+        // Filter only PENDING orders (just in case)
+        final pendingOrders = orders.where((o) => o.status == 'PENDING').toList();
+        print('📋 Filtered to ${pendingOrders.length} PENDING orders');
         
         // Clear cart first
         _cart.clear();
         
-        // Populate cart with existing items
-        for (var order in orders) {
-          // Debug: Order ${order.id}: ${order.items.length} items
+        // Populate cart with existing items from all pending orders
+        for (var order in pendingOrders) {
+          print('📦 Order ${order.id} (status: ${order.status}): ${order.items.length} items');
           for (var item in order.items) {
-            _cart[item.dishId] = (_cart[item.dishId] ?? 0) + item.quantity;
-            // Debug: Dish ${item.dishId}: ${item.quantity}x
+            final oldQty = _cart[item.dishId] ?? 0;
+            _cart[item.dishId] = oldQty + item.quantity;
+            print('  ➕ Dish ${item.dishId}: ${oldQty} + ${item.quantity} = ${_cart[item.dishId]}x (price: ${item.price})');
           }
         }
-        // Debug: Cart initialized with ${_cart.length} unique dishes
+        print('🛒 Cart initialized with ${_cart.length} unique dishes');
+        print('🛒 Cart contents: ${_cart.entries.map((e) => 'Dish ${e.key}: ${e.value}x').join(', ')}');
       } else {
-        // Debug: No active session - starting with empty cart
+        print('ℹ️ No active session - starting with empty cart');
         _cart.clear();
       }
     } catch (e) {
-      // Error loading orders: $e
+      print('❌ Error loading orders: $e');
       _cart.clear();
-    } finally {
-      setState(() => _isLoading = false);
     }
   }
 
@@ -100,7 +133,9 @@ class _ModernOrderScreenState extends State<ModernOrderScreen> {
     setState(() => _isSubmitting = true);
 
     try {
-      int? sessionId = widget.table.activeSession?.id;
+      // Use refreshed table data if available, otherwise fallback to original
+      final table = _currentTable ?? widget.table;
+      int? sessionId = table.activeSession?.id;
       
       // Step 1: Create new order with current cart FIRST
       final items = _cart.entries.map((entry) {
@@ -117,28 +152,33 @@ class _ModernOrderScreenState extends State<ModernOrderScreen> {
         }
       }).where((item) => item != null).toList();
 
-      // Debug: Creating new order with ${items.length} items
-      await ApiService.post('/orders', {
-        'tableId': widget.table.id,
+      print('📤 Creating new order with ${items.length} items');
+      final createResponse = await ApiService.post('/orders', {
+        'tableId': table.id,
         'tableSessionId': sessionId,
         'items': items,
       });
-
-      // Debug: New order created successfully
+      
+      final createdOrderData = ApiService.handleResponse(createResponse);
+      final createdOrder = OrderModel.Order.fromJson(createdOrderData);
+      print('✅ New order created with ID: ${createdOrder.id}');
       
       // Step 2: Only cancel old PENDING orders AFTER new order is created successfully
       if (sessionId != null) {
-        // Debug: Cancelling old pending orders for session $sessionId
+        print('🔄 Cancelling old pending orders for session $sessionId');
         final existingResponse = await ApiService.get('/orders?tableSessionId=$sessionId&status=PENDING');
         final existingData = ApiService.handleResponse(existingResponse);
         final existingOrders = (existingData as List).map((json) => OrderModel.Order.fromJson(json)).toList();
         
-        // Cancel all PENDING orders except the one we just created
+        print('📋 Found ${existingOrders.length} pending orders (including new one)');
+        
+        // Cancel all PENDING orders EXCEPT the one we just created
         for (var order in existingOrders) {
-          // Skip if this is the order we just created (it will be the newest one)
-          if (existingOrders.indexOf(order) < existingOrders.length - 1) {
+          if (order.id != createdOrder.id) {
+            print('❌ Cancelling old order ${order.id}');
             await ApiService.put('/orders/${order.id}/status', {'status': 'CANCELLED'});
-            // Debug: Cancelled old order ${order.id}
+          } else {
+            print('✅ Keeping new order ${order.id}');
           }
         }
       }
@@ -186,10 +226,11 @@ class _ModernOrderScreenState extends State<ModernOrderScreen> {
 
     final menu = menuSupplier.menu;
     final cartItemCount = _cart.values.fold<int>(0, (sum, qty) => sum + qty);
+    final table = _currentTable ?? widget.table;
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('Gọi món - ${widget.table.name}'),
+        title: Text('Gọi món - ${table.name}'),
         backgroundColor: Colors.orange,
         actions: [
           if (cartItemCount > 0)
@@ -259,9 +300,13 @@ class _ModernOrderScreenState extends State<ModernOrderScreen> {
                                         borderRadius: const BorderRadius.vertical(
                                           top: Radius.circular(12),
                                         ),
-                                        image: DecorationImage(
-                                          image: dish.imgProvider,
-                                          fit: BoxFit.cover,
+                                        color: Theme.of(context).colorScheme.primaryContainer,
+                                      ),
+                                      child: Center(
+                                        child: Icon(
+                                          Icons.restaurant_menu,
+                                          size: 60,
+                                          color: Theme.of(context).colorScheme.onPrimaryContainer,
                                         ),
                                       ),
                                     ),
@@ -395,11 +440,33 @@ class _ModernOrderScreenState extends State<ModernOrderScreen> {
                             ],
                           ),
                         )
-                      : ListView(
-                          padding: const EdgeInsets.all(16),
-                          children: menu
-                              .where((dish) => _cart.containsKey(dish.id))
-                              .map((dish) {
+                      : Builder(
+                          builder: (context) {
+                            // Debug: Log menu dish IDs and cart dish IDs
+                            final menuDishIds = menu.map((d) => d.id).toList();
+                            final cartDishIds = _cart.keys.toList();
+                            print('📋 Menu dish IDs: $menuDishIds');
+                            print('🛒 Cart dish IDs: $cartDishIds');
+                            
+                            // Filter dishes that exist in both menu and cart
+                            final validDishes = menu.where((dish) {
+                              final inCart = _cart.containsKey(dish.id);
+                              if (!inCart) {
+                                print('⚠️ Dish ${dish.id} (${dish.dish}) not in cart');
+                              }
+                              return inCart;
+                            }).toList();
+                            
+                            // Check for dishes in cart but not in menu
+                            for (var cartDishId in cartDishIds) {
+                              if (!menuDishIds.contains(cartDishId)) {
+                                print('⚠️ Cart has dish $cartDishId but it\'s not in menu');
+                              }
+                            }
+                            
+                            return ListView(
+                              padding: const EdgeInsets.all(16),
+                              children: validDishes.map((dish) {
                             final quantity = _cart[dish.id]!;
                             return Card(
                               margin: const EdgeInsets.only(bottom: 12),
@@ -412,10 +479,12 @@ class _ModernOrderScreenState extends State<ModernOrderScreen> {
                                       height: 60,
                                       decoration: BoxDecoration(
                                         borderRadius: BorderRadius.circular(8),
-                                        image: DecorationImage(
-                                          image: dish.imgProvider,
-                                          fit: BoxFit.cover,
-                                        ),
+                                        color: Theme.of(context).colorScheme.primaryContainer,
+                                      ),
+                                      child: Icon(
+                                        Icons.restaurant_menu,
+                                        size: 30,
+                                        color: Theme.of(context).colorScheme.onPrimaryContainer,
                                       ),
                                     ),
                                     const SizedBox(width: 12),
@@ -470,6 +539,8 @@ class _ModernOrderScreenState extends State<ModernOrderScreen> {
                               ),
                             );
                           }).toList(),
+                            );
+                          },
                         ),
                 ),
                 if (_cart.isNotEmpty)
