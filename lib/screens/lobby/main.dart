@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
@@ -103,6 +104,18 @@ class LobbyScreen extends HookWidget {
       );
     }
 
+    // Store GlobalKeys for each floor tab to access their state
+    final floorTabKeysMap = useMemoized(
+      () {
+        final map = <int, GlobalKey<_FloorTabViewState>>{};
+        for (var floor in floors.value) {
+          map[floor.id] = GlobalKey<_FloorTabViewState>();
+        }
+        return map;
+      },
+      [floors.value.map((f) => f.id).join(',')],
+    );
+
     return Scaffold(
       bottomNavigationBar: _buildBottomBar(context),
       floatingActionButton: AnimatedLongClickableFAB(
@@ -111,6 +124,19 @@ class LobbyScreen extends HookWidget {
           if (floors.value.isNotEmpty) {
             final currentFloor = floors.value[controller.index];
             context.read<NodeSupplier>().addNode(currentFloor.id);
+          }
+        },
+        onPressed: () {
+          // Add table to current floor when button is tapped
+          if (floors.value.isNotEmpty) {
+            final currentFloor = floors.value[controller.index];
+            _showAddTableDialog(context, currentFloor, () {
+              // Reload tables for current floor after adding
+              final key = floorTabKeysMap[currentFloor.id];
+              if (key?.currentState != null) {
+                key!.currentState!._loadTables();
+              }
+            });
           }
         },
       ),
@@ -141,7 +167,10 @@ class LobbyScreen extends HookWidget {
         physics: const NeverScrollableScrollPhysics(),
         controller: controller,
         children: floors.value
-            .map((floor) => _FloorTabView(floor: floor))
+            .map((floor) => _FloorTabView(
+                  key: floorTabKeysMap[floor.id],
+                  floor: floor,
+                ))
             .toList(),
       ),
     );
@@ -241,6 +270,94 @@ class LobbyScreen extends HookWidget {
       },
     );
   }
+
+  Future<void> _showAddTableDialog(
+    BuildContext context,
+    ApiFloor.Floor floor,
+    VoidCallback onSuccess,
+  ) async {
+    final nameController = TextEditingController();
+    final hourlyRateController = TextEditingController(text: '50000');
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Thêm bàn mới vào ${floor.name}'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameController,
+                decoration: const InputDecoration(
+                  labelText: 'Tên bàn',
+                  hintText: 'VD: Bàn 1',
+                ),
+                autofocus: true,
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: hourlyRateController,
+                decoration: const InputDecoration(
+                  labelText: 'Giá theo giờ (VNĐ)',
+                  hintText: '50000',
+                  prefixIcon: Icon(Icons.attach_money),
+                ),
+                keyboardType: TextInputType.number,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Giá này sẽ được tính khi khách chơi bàn theo giờ',
+                style: TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Hủy'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              if (nameController.text.trim().isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Vui lòng nhập tên bàn')),
+                );
+                return;
+              }
+
+              try {
+                await TableService.create(
+                  floorId: floor.id,
+                  name: nameController.text.trim(),
+                  hourlyRate: double.tryParse(hourlyRateController.text) ?? 50000,
+                );
+                if (context.mounted) {
+                  Navigator.pop(context, true);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Thêm bàn thành công')),
+                  );
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Lỗi: ${e.toString()}')),
+                  );
+                }
+              }
+            },
+            child: const Text('Thêm'),
+          ),
+        ],
+      ),
+    );
+
+    if (result == true) {
+      onSuccess();
+    }
+  }
 }
 
 /// Floor tab view showing tables from API
@@ -279,6 +396,7 @@ class _FloorTabViewState extends State<_FloorTabView>
     });
   }
 
+  // Make _loadTables public so it can be called from parent
   Future<void> _loadTables() async {
     setState(() => _isLoading = true);
     try {

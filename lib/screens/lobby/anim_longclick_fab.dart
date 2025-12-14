@@ -13,8 +13,9 @@ const _targetTime = Duration(milliseconds: 600);
 class AnimatedLongClickableFAB extends HookWidget {
   final ColorTween cTween = ColorTween(begin: RallyColors.gray, end: RallyColors.primaryColor);
   final VoidCallback onLongPress;
+  final VoidCallback? onPressed;
 
-  AnimatedLongClickableFAB({required this.onLongPress});
+  AnimatedLongClickableFAB({required this.onLongPress, this.onPressed});
 
   @override
   Widget build(BuildContext context) {
@@ -51,7 +52,13 @@ class AnimatedLongClickableFAB extends HookWidget {
               colorController.forward();
             },
             onTapUp: (_) {
-              if (t.value != null && t.value!.isActive) t.value!.cancel();
+              if (t.value != null && t.value!.isActive) {
+                t.value!.cancel();
+                // If tap was quick (not long press), trigger onPressed
+                if (onPressed != null) {
+                  onPressed!();
+                }
+              }
               valueController.reset();
               colorController.reset();
             },
