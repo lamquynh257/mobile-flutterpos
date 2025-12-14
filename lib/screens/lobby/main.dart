@@ -239,14 +239,14 @@ class LobbyScreen extends HookWidget {
             ),
             const Divider(),
             ListTile(
-              leading: const Icon(Icons.people),
+              leading: const Icon(Icons.settings),
               title: const Text(
-                'QUẢN LÝ USER',
+                'CÀI ĐẶT',
                 textAlign: TextAlign.center,
               ),
               onTap: () {
                 Navigator.pop(context);
-                Navigator.pushNamed(context, '/user-management');
+                Navigator.pushNamed(context, '/settings');
               },
             ),
             const Divider(),

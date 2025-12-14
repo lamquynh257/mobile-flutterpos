@@ -19,6 +19,8 @@ import 'screens/checkout/checkout_screen.dart';
 import 'screens/menu/menu_management_screen.dart';
 import 'screens/order/order_food_screen.dart'; // ModernOrderScreen
 import 'screens/report/report_screen.dart';
+import 'screens/settings/settings_screen.dart';
+import 'screens/settings/bill_settings_screen.dart';
 import 'screens/order_details/main.dart';
 import 'services/auth_service.dart';
 import 'models/floor.dart';
@@ -134,6 +136,10 @@ class PosApp extends StatelessWidget {
             );
           case '/user-management':
             return MaterialPageRoute(builder: (_) => const UserManagementScreen());
+          case '/settings':
+            return MaterialPageRoute(builder: (_) => const SettingsScreen());
+          case '/bill-settings':
+            return MaterialPageRoute(builder: (_) => const BillSettingsScreen());
           case '/history':
             return MaterialPageRoute(builder: (_) => const ReportScreen());
           case '/expense':

@@ -21,11 +21,30 @@ class _ModernOrderScreenState extends State<ModernOrderScreen> {
   bool _isSubmitting = false;
   bool _isLoading = true;
   TableModel? _currentTable; // Store refreshed table data
+  bool _hasReloadedMenu = false;
 
   @override
   void initState() {
     super.initState();
     _loadTableAndOrders();
+    // Reload menu data when entering screen to ensure fresh data from database
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_hasReloadedMenu && mounted) {
+        _hasReloadedMenu = true;
+        final supplier = context.read<MenuSupplier>();
+        // Reload menu from database/API
+        if (supplier.menu.isEmpty) {
+          // If menu is empty, reload immediately (will show loading)
+          supplier.reload();
+        } else {
+          // If menu has data, reload in background silently to refresh from database
+          supplier.reload(silent: true).catchError((e) {
+            print('⚠️ Background menu reload failed: $e');
+            // Don't show error to user if we have existing data
+          });
+        }
+      }
+    });
   }
 
   /// Reload table data from server and then load orders

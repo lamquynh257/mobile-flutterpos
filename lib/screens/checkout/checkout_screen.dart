@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'dart:typed_data';
+import 'dart:ui' as ui;
 import 'package:blue_thermal_printer/blue_thermal_printer.dart';
+import 'package:image/image.dart' as img;
 import '../../models/table_model.dart';
 import '../../services/table_service.dart';
+import '../../services/bill_settings_service.dart';
 
 class CheckoutScreen extends StatefulWidget {
   final TableModel table;
@@ -52,10 +56,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   String _formatCurrency(double amount) {
-    return '${amount.toInt().toString().replaceAllMapped(
-          RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-          (Match m) => '${m[1]},',
-        )}đ';
+    // Format currency - avoid special characters that might cause Java Formatter issues
+    final formatted = amount.toInt().toString().replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      (Match m) => '${m[1]},',
+    );
+    // Keep 'đ' but ensure it's properly encoded
+    return '$formattedđ';
   }
 
   String _formatDateTime(dynamic dateTime) {
@@ -100,6 +107,86 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     final m = (duration.inMinutes % 60).toString().padLeft(2, '0');
     final s = (duration.inSeconds % 60).toString().padLeft(2, '0');
     return '$h:$m:$s';
+  }
+
+  // Helper function to print QR code image
+  Future<void> _printQrCodeImage(BlueThermalPrinter printer, Uint8List imageBytes) async {
+    try {
+      // Decode image
+      img.Image? image = img.decodeImage(imageBytes);
+      if (image == null) {
+        print('⚠️ Cannot decode QR code image');
+        return;
+      }
+
+      // Resize image to fit thermal printer width (typically 384 pixels for 58mm printer)
+      // Keep aspect ratio
+      const int maxWidth = 384;
+      if (image.width > maxWidth) {
+        final ratio = maxWidth / image.width;
+        final newHeight = (image.height * ratio).round();
+        image = img.copyResize(image, width: maxWidth, height: newHeight);
+      }
+
+      // Convert to grayscale for better printing
+      image = img.grayscale(image);
+
+      // Convert image to bytes for printing
+      final processedBytes = Uint8List.fromList(img.encodePng(image));
+
+      // Try different methods to print image
+      // BlueThermalPrinter may have different method names in different versions
+      bool printed = false;
+      
+      // Method 1: Try printImageBytes (most common)
+      try {
+        await (printer as dynamic).printImageBytes(processedBytes);
+        printed = true;
+      } catch (e) {
+        if (e is NoSuchMethodError) {
+          // Method doesn't exist, try next
+        } else {
+          // Other error, log and try next
+          print('⚠️ printImageBytes error: $e');
+        }
+      }
+
+      // Method 2: Try printImage
+      if (!printed) {
+        try {
+          await (printer as dynamic).printImage(processedBytes);
+          printed = true;
+        } catch (e) {
+          if (e is NoSuchMethodError) {
+            // Method doesn't exist, try next
+          } else {
+            print('⚠️ printImage error: $e');
+          }
+        }
+      }
+
+      // Method 3: Try printBytes
+      if (!printed) {
+        try {
+          await (printer as dynamic).printBytes(processedBytes);
+          printed = true;
+        } catch (e) {
+          if (e is NoSuchMethodError) {
+            // Method doesn't exist
+          } else {
+            print('⚠️ printBytes error: $e');
+          }
+        }
+      }
+
+      if (!printed) {
+        print('⚠️ QR code printing not supported. No image printing methods found in BlueThermalPrinter.');
+        print('⚠️ Receipt will be printed without QR code.');
+      }
+    } catch (e) {
+      print('⚠️ Error processing QR code image: $e');
+      // Continue without QR code - receipt will still print
+    }
   }
 
   Future<void> _completePayment() async {
@@ -220,8 +307,36 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       final orderTotal = (_checkoutData!['orderTotal'] ?? 0.0) as num;
       final grandTotal = (_checkoutData!['grandTotal'] ?? 0.0) as num;
 
+      // Load bill settings
+      final storeName = await BillSettingsService.getStoreName();
+      final storeAddress = await BillSettingsService.getStoreAddress();
+      final storePhone = await BillSettingsService.getStorePhone();
+      final qrCodeImage = await BillSettingsService.getQrCodeImage();
+
       // Print Header
       await printer.printCustom('HOA DON', 3, 1); // Remove accents
+      
+      // Print store information if available
+      // Store name: auto-adjust font size if too long (max ~32 chars for normal size)
+      if (storeName.isNotEmpty) {
+        // Thermal printer typically has ~32-48 chars per line
+        // Size 2 (bold medium) = ~32 chars, Size 1 (bold) = ~40 chars, Size 0 (normal) = ~48 chars
+        if (storeName.length <= 32) {
+          await printer.printCustom(storeName, 2, 1); // Bold medium, centered
+        } else if (storeName.length <= 40) {
+          await printer.printCustom(storeName, 1, 1); // Bold, centered
+        } else {
+          await printer.printCustom(storeName, 0, 1); // Normal, centered
+        }
+      }
+      if (storeAddress.isNotEmpty) {
+        await printer.printCustom(storeAddress, 0, 1); // Normal, centered
+      }
+      if (storePhone.isNotEmpty) {
+        await printer.printCustom('SDT: $storePhone', 0, 1); // Normal, centered
+      }
+      
+      await printer.printCustom('--------------------------------', 0, 1);
       await printer.printCustom(_formatDateTime(session['startTime']), 0, 1);
       await printer.printCustom('================================', 1, 1);
       
@@ -231,21 +346,18 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       await printer.printCustom('--------------------------------', 0, 1);
       
       // Print Hourly Charge Breakdown
-      await printer.printLeftRight(
-        'Tien ban:',
-        _formatCurrency(hourlyCharge.toDouble()),
-        0
-      );
-      await printer.printLeftRight(
-        '  ${_formatDuration(totalHours.toDouble())}',
-        'x ${_formatCurrency(hourlyRate.toDouble())}',
+      // Print Hourly Charge - use printCustom to avoid format issues
+      await printer.printCustom('Tien ban: ${_formatCurrency(hourlyCharge.toDouble())}', 0, 0);
+      await printer.printCustom(
+        '  ${_formatDuration(totalHours.toDouble())} x ${_formatCurrency(hourlyRate.toDouble())}',
+        0,
         0
       );
       
       // Print Food Items
       if (orders != null && orders.isNotEmpty) {
         await printer.printCustom('--------------------------------', 0, 1);
-        await printer.printCustom('Mon an:', 1, 0); // Bold, Left
+        await printer.printLeftRight('Mon an:', '', 1); // Bold, Left aligned with other labels
         
         for (final order in orders) {
           final items = order['items'] as List? ?? [];
@@ -256,7 +368,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             final total = quantity * price.toDouble();
             
             await printer.printLeftRight(
-              '  ${dish?['name'] ?? 'N/A'} (x$quantity)',
+              '${dish?['name'] ?? 'N/A'} (x$quantity)',
               _formatCurrency(total),
               0,
             );
@@ -271,6 +383,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       await printer.printCustom('================================', 1, 1);
       await printer.printLeftRight('TONG CONG:', _formatCurrency(grandTotal.toDouble()), 2); // Size 2
       await printer.printCustom('================================', 1, 1);
+      
+      // Print QR Code if available (before thank you message)
+      if (qrCodeImage != null) {
+        await printer.printNewLine();
+        await _printQrCodeImage(printer, qrCodeImage);
+        await printer.printNewLine();
+      }
       
       // Print Footer
       await printer.printCustom('Cam on quy khach!', 2, 1);

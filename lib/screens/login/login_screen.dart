@@ -68,14 +68,10 @@ class _LoginScreenState extends State<LoginScreen> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(
-                        Icons.restaurant,
-                        size: 80,
-                        color: Colors.green,
-                      ),
+                      
                       const SizedBox(height: 16),
                       const Text(
-                        'POS System',
+                        'Kiss POS',
                         style: TextStyle(
                           fontSize: 28,
                           fontWeight: FontWeight.bold,
@@ -171,14 +167,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 ),
                         ),
                       ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'Mặc định: admin / admin123',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey.shade600,
-                        ),
-                      ),
+                      
                     ],
                   ),
                 ),
