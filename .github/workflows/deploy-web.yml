@@ -1,0 +1,37 @@
+name: Deploy Flutter Web to GitHub Pages
+
+on:
+  push:
+    branches:
+      - main  # Change to your main branch name if different
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.x'  # Adjust to your Flutter version
+          channel: 'stable'
+
+      - name: Get dependencies
+        run: cd flutter-pos && flutter pub get
+
+      - name: Build web
+        run: cd flutter-pos && flutter build web --release --base-href "/${{ github.event.repository.name }}/"
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./flutter-pos/build/web
+          # If deploying to root of username.github.io, use:
+          # publish_dir: ./flutter-pos/build/web
+          # And change base-href to "/" in build command above
+
