@@ -144,13 +144,18 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         return;
       }
 
-      // Resize image to fit thermal printer width (typically 384 pixels for 58mm printer)
-      // Keep aspect ratio
-      const int maxWidth = 384;
+      // Resize image to fit thermal printer width
+      // Thermal printers print continuously without page limits - no need to restrict size
+      const int maxWidth = 250; // Appropriate size for QR code readability
       if (image.width > maxWidth) {
         final ratio = maxWidth / image.width;
         final newHeight = (image.height * ratio).round();
         image = img.copyResize(image, width: maxWidth, height: newHeight);
+      } else if (image.width < maxWidth * 0.8) {
+        // If image is too small, scale it up for better readability
+        final scaleFactor = (maxWidth * 0.8) / image.width;
+        final newHeight = (image.height * scaleFactor).round();
+        image = img.copyResize(image, width: (image.width * scaleFactor).round(), height: newHeight);
       }
 
       // Convert to grayscale for better printing
@@ -409,15 +414,18 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       await printer.printCustom('================================', 1, 1);
       
       // Print QR Code if available (before thank you message)
+      // Feed paper a bit before QR code to ensure continuous printing
       if (qrCodeImage != null) {
+        // Add minimal spacing before QR code
         await printer.printNewLine();
         await _printQrCodeImage(printer, qrCodeImage);
+        // Feed paper after QR code to ensure it's fully printed
         await printer.printNewLine();
       }
       
       // Print Footer
       await printer.printCustom('Cam on quy khach!', 2, 1);
-      await printer.printNewLine();
+      // Feed paper before cutting to ensure all content is printed
       await printer.printNewLine();
       await printer.printNewLine();
       await printer.paperCut();
