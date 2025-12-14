@@ -28,12 +28,24 @@ class EditMenuScreenState extends State<EditMenuScreen> {
   @override
   void initState() {
     super.initState();
-    // Reload menu data when entering EditMenuScreen to ensure fresh data from database
+    // Reload menu data in background when entering EditMenuScreen to ensure fresh data
+    // But don't block UI - show existing data immediately
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!_hasReloaded && mounted) {
         _hasReloaded = true;
         final supplier = context.read<MenuSupplier>();
-        supplier.reload();
+        // Only reload if menu is empty or we want to refresh
+        // Reload in background without blocking UI
+        if (supplier.menu.isEmpty) {
+          // If menu is empty, reload immediately (will show loading)
+          supplier.reload();
+        } else {
+          // If menu has data, reload in background silently (won't show loading indicator)
+          supplier.reload(silent: true).catchError((e) {
+            print('⚠️ Background reload failed: $e');
+            // Don't show error to user if we have existing data
+          });
+        }
       }
     });
   }

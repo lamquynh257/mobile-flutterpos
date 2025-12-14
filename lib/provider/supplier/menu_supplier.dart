@@ -62,6 +62,11 @@ class MenuSupplier extends ChangeNotifier {
   }
 
   Future<void> _ensureDefaultCategory() async {
+    // Skip if already have category ID (optimization)
+    if (_defaultCategoryId != null) {
+      return;
+    }
+    
     try {
       final categories = await CategoryService.getAll();
       
@@ -69,55 +74,37 @@ class MenuSupplier extends ChangeNotifier {
         // Create default category
         final category = await CategoryService.create(name: 'Thực đơn', order: 0);
         _defaultCategoryId = category.id;
-        print('✅ Created default category: ${category.id}');
       } else {
         _defaultCategoryId = categories.first.id;
-        print('✅ Using existing category: $_defaultCategoryId');
       }
     } catch (e, stack) {
       print('❌ Error ensuring category: $e');
-      print('Stack: $stack');
       // Don't rethrow - allow fallback to default menu
       // Set a default category ID to avoid null issues
       _defaultCategoryId = 1; // Fallback ID
-      print('⚠️ Using fallback category ID: $_defaultCategoryId');
     }
   }
 
   Future<void> _loadDishesFromAPI() async {
     try {
-      print('🍽️ Loading ALL dishes from API (not filtering by category)');
-      
       // Load ALL dishes from API, not just from one category
       // This ensures we get all dishes from the database
       final apiDishes = await DishService.getAll(); // No categoryId filter
-      print('🍽️ Received ${apiDishes.length} dishes from API');
       
       if (apiDishes.isEmpty) {
-        print('⚠️ No dishes found in API, using default menu');
         _m = _defaultMenu();
         return;
       }
       
       // Convert API dishes to local Dish model
-      print('🔄 Converting ${apiDishes.length} dishes from API...');
       _m = apiDishes.map((apiDish) {
         try {
-          final converted = _convertFromApiDish(apiDish);
-          print('  ✅ Converted: ${apiDish.id} - ${apiDish.name} (${apiDish.price})');
-          return converted;
+          return _convertFromApiDish(apiDish);
         } catch (e, stack) {
           print('⚠️ Error converting dish ${apiDish.id} (${apiDish.name}): $e');
-          print('Stack: $stack');
           return null;
         }
       }).whereType<Dish>().toList();
-      
-      print('🍽️ Successfully converted ${_m.length} dishes to local model');
-      print('📋 Final menu items:');
-      for (var dish in _m) {
-        print('  - ${dish.id}: ${dish.dish} (${dish.price})');
-      }
       
       // If no dishes, add defaults
       if (_m.isEmpty) {
@@ -146,7 +133,6 @@ class MenuSupplier extends ChangeNotifier {
   Dish _convertFromApiDish(ApiDish.Dish apiDish) {
     // Convert API dish to local Dish model
     // Local Dish model expects: {id, dish, price, asset}
-    print('🔄 Converting dish: ${apiDish.id} - ${apiDish.name} - ${apiDish.price}');
     
     // Map dish name to asset path (similar to default menu)
     final assetPath = _getAssetPathForDish(apiDish.name);
@@ -317,36 +303,40 @@ class MenuSupplier extends ChangeNotifier {
 
   /// Reload dishes from API/database
   /// This method should be called when entering EditMenuScreen to ensure fresh data
-  Future<void> reload() async {
-    print('🔄 Reloading menu from API...');
-    _loading = true;
-    notifyListeners();
+  /// [silent] - if true, won't set loading state (for background reload)
+  Future<void> reload({bool silent = false}) async {
+    if (!silent) {
+      _loading = true;
+      notifyListeners();
+    }
     
     try {
-      // Ensure default category exists
-      await _ensureDefaultCategory();
+      // Only ensure category if we don't have one yet (optimization)
+      if (_defaultCategoryId == null) {
+        await _ensureDefaultCategory();
+      }
       
       // Load dishes from API
       await _loadDishesFromAPI();
       
       // Ensure menu is not empty
       if (_m.isEmpty) {
-        print('⚠️ Menu is empty after reload, using defaults');
         _m = _defaultMenu();
       }
       
-      _loading = false;
+      if (!silent) {
+        _loading = false;
+      }
       notifyListeners();
-      print('✅ Menu reloaded successfully, ${_m.length} dishes');
     } catch (e, stack) {
       print('❌ Error reloading menu: $e');
-      print('Stack: $stack');
       // Fallback to default menu if API fails
       if (_m.isEmpty) {
-        print('📋 Using default menu as fallback');
         _m = _defaultMenu();
       }
-      _loading = false;
+      if (!silent) {
+        _loading = false;
+      }
       notifyListeners();
     }
   }
